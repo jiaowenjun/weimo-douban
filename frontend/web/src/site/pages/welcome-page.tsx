@@ -6,7 +6,6 @@ import { FrostedIconButton } from 'weimo-ui-core/components/frosted-icon-button'
 import { TextButton } from 'weimo-ui-core/components/text-button'
 import { MiniSiteTemplate } from 'weimo-ui-template/components/mini-site-template'
 
-import { useDoubanUser } from '../douban-user'
 import appIcon from './assets/app-icon.svg'
 import appIconWhite from './assets/app-icon-white.svg'
 import marksOverviewDark from './assets/marks-overview-dark.png'
@@ -174,12 +173,11 @@ const PLATFORM_LOGO = {
 
 /** 欢迎页（营销页）：`/` 根路径的门面。MiniSiteTemplate 无侧边栏单页壳
  *  （hero 标题区 + 全宽内容），CTA 双按钮——客户端下载居左（更推荐）
- *  +「体验网页版」居右（App 壳内回落进入语义单按钮），主截图一张
+ *  +「体验网页版」居右（App 壳内叫「开始备份」单按钮），主截图一张
  *  收尾。截图按当前生效主题成对提供（*-light/*-dark 各一套实拍，
  *  1024×768，4:3），经 import 引用随生产 base（/douban/）重写资源地址 */
 export function WelcomePage() {
   const navigate = useNavigate()
-  const { uid } = useDoubanUser()
   const dark = useAppliedDarkTheme()
   const { href: downloadHref, label: downloadLabel } =
     DOWNLOAD_CTA[DETECTED_PLATFORM]
@@ -242,8 +240,9 @@ export function WelcomePage() {
           type="button"
         >
           {/* 网页端叫「体验网页版」（承接「一键备份」叙事，与左侧
-              下载客户端相对）；App 壳内已在客户端中，维持进入语义 */}
-          {IN_TAURI_APP ? (uid ? '进入我的标记' : '进入标记列表') : '体验网页版'}
+              下载客户端相对）；App 壳内承接同一叙事叫「开始备份」，
+              点击进入标记页即登录-备份链路 */}
+          {IN_TAURI_APP ? '开始备份' : '体验网页版'}
           <ArrowRight aria-hidden size={16} />
         </TextButton>
       </div>
