@@ -96,7 +96,9 @@ async function requireMarks(promise: Promise<MarksResult>) {
 function useVersion(category: string): string {
   const versions = useContext(CacheVersionContext)
   if (versions === undefined) return 'pending'
-  return versions?.[category as keyof NonNullable<typeof versions>] ?? 'unversioned'
+  // 版本串域（排除 subjects_pending 计数字段——它不是任何查询的版本键）
+  return versions?.[category as 'profile' | 'stats' | 'movie' | 'book' | 'music' | 'all'] ??
+    'unversioned'
 }
 
 /** Keep a previous successful revision visible when fetching a new one fails.

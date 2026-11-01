@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useContext, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { ReactNode } from 'react'
 import { Navigate, useParams, useSearchParams } from 'react-router'
 
@@ -11,6 +11,7 @@ import {
   triggerDoubanFirstSync,
 } from '../api'
 import { useDoubanUser } from '../douban-user'
+import { CacheVersionContext } from '../cache-version'
 import {
   doubanQueryKeys,
   fetchDoubanMarksPage,
@@ -265,17 +266,24 @@ export function MarksPage() {
 
   // 同步中双轮询（3s）：失效版本查询让首发直写的每页落库尽快可见
   // （revision bump → 版本 key 变化 → 数据查询自动重拉；60s 常规轮询
-  // 兜底），同时查任务终态——到终态停轮询收起横幅。轮询失败静默由
-  // 下一 tick 重试（会话级短生命周期，任务过期清理等场景无谓报错）
+  // 兜底），同时查任务终态——到终态停轮询收起横幅；终态后富集未清
+  // （versions.subjects_pending>0，旧后端无字段按 0）仍维持 3s 版本轮
+  // 询——富集逐条落库（评分/形态归位）持续可见，pending 归零自动停。
+  // 轮询失败静默由下一 tick 重试（会话级短生命周期，任务过期清理等
+  // 场景无谓报错）；存活条件用布尔（pending 数值每条富集都变，作依赖
+  // 会反复重启 interval）
   const syncTaskId = syncPhase?.phase === 'syncing' ? syncPhase.taskId : null
+  const versions = useContext(CacheVersionContext)
+  const keepPolling = syncTaskId !== null || (versions?.subjects_pending ?? 0) > 0
   useEffect(() => {
-    if (!syncTaskId || !uid) return
+    if (!keepPolling || !uid) return
     let stopped = false
     const timer = setInterval(() => {
       if (stopped) return
       void queryClient.invalidateQueries({
         queryKey: [...doubanQueryKeys.uid(uid), 'versions'],
       })
+      if (!syncTaskId) return
       void fetchDoubanSyncTask(syncTaskId)
         .then((task) => {
           if (stopped) return
@@ -309,7 +317,7 @@ export function MarksPage() {
       stopped = true
       clearInterval(timer)
     }
-  }, [syncTaskId, uid])
+  }, [keepPolling, syncTaskId, uid])
 
   // 完成横幅的收起时序：全显 ~2s 后随 CSS 动画淡出（共 2.4s），动画
   // 播完卸载元素进入会话终态；items 是 done 态的稳定标识（effect 只在

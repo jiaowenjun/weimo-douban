@@ -38,6 +38,9 @@ pub struct Versions {
     pub book: String,
     pub music: String,
     pub all: String,
+    /// 富集待处理 job 数（queued+running，全局）——前端据此在同步终态
+    /// 后维持高频版本轮询（富集逐条落库持续可见），pending 归零自动停
+    pub subjects_pending: i64,
 }
 
 pub async fn versions(state: &AppState, uid: &str, status: &str) -> AppResult<Versions> {
@@ -66,6 +69,12 @@ pub async fn versions(state: &AppState, uid: &str, status: &str) -> AppResult<Ve
         .iter()
         .map(|cat| revision(format!("subjects:{cat}")))
         .collect();
+    // pending 入队/出队不必然伴随 revision 变化（入队无触发器），单独
+    // 计数；量级为 job 表行数（千级内），COUNT 毫秒级
+    let subjects_pending: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM subject_jobs WHERE state IN ('queued','running')")
+            .fetch_one(&state.pool)
+            .await?;
     let base = format!("v1-{identity}-{status}");
     Ok(Versions {
         profile: format!("{base}-p{}", revision(format!("profile:{uid}"))),
@@ -74,6 +83,7 @@ pub async fn versions(state: &AppState, uid: &str, status: &str) -> AppResult<Ve
         book: format!("{base}-{}-{}", marks[1], subjects[1]),
         music: format!("{base}-{}-{}", marks[2], subjects[2]),
         all: format!("{base}-{:?}-{:?}", marks, subjects),
+        subjects_pending,
     })
 }
 
@@ -187,7 +197,15 @@ pub async fn middleware(State(state): State<AppState>, req: Request<Body>, next:
         return response;
     }
     let key = if endpoint == "cache-version" {
-        format!("{}:{}:{}", req.uri(), v.all, v.profile)
+        // pending 掺进 ETag：job 入队不 bump revision（触发器只盯内容），
+        // 缺了它 pending 变化会被 304 吞掉，前端感知不到轮询该续/该停
+        format!(
+            "{}:{}:{}:{}",
+            req.uri(),
+            v.all,
+            v.profile,
+            v.subjects_pending
+        )
     } else {
         format!("{}:{version}", req.uri())
     };

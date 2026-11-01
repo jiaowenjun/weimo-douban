@@ -2912,6 +2912,53 @@ async fn refresh_keeps_published_snapshot_until_success_and_after_failure() {
     );
 }
 
+/// cache-version 的 subjects_pending：富集 job 入队（不 bump revision）
+/// 也要让版本端点给出新体（ETag 掺 pending，304 不吞）——前端据此在
+/// 同步终态后维持 3s 轮询，pending 归零自动停
+#[tokio::test]
+async fn cache_version_exposes_subjects_pending_and_etag_tracks_it() {
+    let (_dir, state) = setup().await;
+    post_sync(&state, json!({"user": "wenjun30", "categories": ["music"]})).await;
+    drive(&state, &fixture_fetcher()).await;
+    let uri = "/api/v1/users/wenjun30/cache-version?status=collect";
+
+    // 首发完成即入队富集 job：pending 随版本端点暴露
+    let (code1, headers1, v1) = conditional_get(&state, uri, None, None).await;
+    assert_eq!(code1, StatusCode::OK);
+    let tag1 = headers1
+        .get(header::ETAG)
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string();
+    assert!(
+        v1["subjects_pending"].as_i64().unwrap() > 0,
+        "首发完成后应有富集 job 在队: {v1}"
+    );
+
+    // 无变化时保持协商缓存语义（304 空体）
+    let (code304, _, _) = conditional_get(&state, uri, Some(&tag1), None).await;
+    assert_eq!(code304, StatusCode::NOT_MODIFIED);
+
+    // 清空富集队列（终态全部 job）：pending 归零，ETag 随之变化——
+    // 旧 tag 再请求必须是 200 新体而非 304（入队/出队不 bump revision，
+    // pending 是 ETag 的独立组成）
+    sqlx::query("UPDATE subject_jobs SET state='ok', next_run_ms=NULL")
+        .execute(&state.pool)
+        .await
+        .unwrap();
+    let (code2, headers2, v2) = conditional_get(&state, uri, Some(&tag1), None).await;
+    assert_eq!(code2, StatusCode::OK);
+    assert_eq!(v2["subjects_pending"], 0);
+    let tag2 = headers2
+        .get(header::ETAG)
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string();
+    assert_ne!(tag1, tag2, "pending 变化应改变 ETag（304 不得吞掉）");
+}
+
 #[tokio::test]
 async fn unchanged_sync_keeps_content_version_and_stable_order() {
     let (_dir, state) = setup().await;
