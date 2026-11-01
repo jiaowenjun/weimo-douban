@@ -191,6 +191,8 @@ export type MarksResult =
  *  未富集回退 intro 启发式合成，旧版后端不认该参数）。
  *  ids 为可选的当页条目 id 集合（前端 dims 保序筛出的切片，顺序权威
  *  在前端）：提供时后端按传入顺序返回，忽略 page/page_size。
+ *  pagingVersion 为新版分页守卫，version 保留完整内容版本供旧后端校验；
+ *  新后端优先校验 pagingVersion，允许详情富集与翻页并行。
  *  404 DIMENSION_NOT_CACHED（该用户该维度尚未同步过）单列为 not-cached，
  *  其余失败（网络/限流/鉴权等）归为 error，均不抛错 */
 export async function fetchDoubanMarks(
@@ -201,6 +203,7 @@ export async function fetchDoubanMarks(
   ids?: readonly string[] | null,
   rating?: string | null,
   version?: string,
+  pagingVersion?: string,
 ): Promise<MarksResult> {
   const params = new URLSearchParams({
     category,
@@ -210,6 +213,7 @@ export async function fetchDoubanMarks(
     expand: 'subject',
   })
   if (version && version !== 'unversioned' && version !== 'pending') params.set('cache_version', version)
+  if (pagingVersion) params.set('paging_version', pagingVersion)
   if (ids?.length) {
     params.set('ids', ids.join(','))
   }
@@ -229,11 +233,12 @@ export async function fetchDoubanMarks(
     try {
       const body = await res.json()
       if (body?.error?.code === 'DIMENSION_NOT_CACHED') kind = 'not-cached'
-      // 409：取版本与取数据之间被重新发布（瞬态），失效版本查询按新
-      // 版本 key 自动重拉，调用方不作失败展示
+      // 409：分页读取期间数据变化，列表控制器会重取版本并重建完整范围。
       if (body?.error?.code === 'CACHE_VERSION_CHANGED') {
         kind = 'version-stale'
-        void queryClient.invalidateQueries({ queryKey: ['douban', uid, 'versions'] })
+        // The paging controller owns bounded recovery for the new protocol.
+        // Legacy callers still recover by invalidating the manifest.
+        if (!pagingVersion) void queryClient.invalidateQueries({ queryKey: ['douban', uid, 'versions'] })
       }
       // 429：固定分钟窗口限流（同步高峰瞬态），窗口翻页自愈，同 409
       // 不作失败展示

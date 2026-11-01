@@ -103,8 +103,8 @@ export function useFirstSyncPhase(uid: string | null): FirstSync | undefined {
 
 /** 生命周期轮询（挂 DoubanUserProvider 内全局唯一实例）——syncing 任务
  *  或富集 pending>0（versions.subjects_pending，旧后端按 0）期间每 3s
- *  失效版本查询：首发直写的每页落库与富集逐条落库都经 revision bump →
- *  版本 key 变化 → 数据查询自动重拉（60s 常规轮询兜底）；同步中同时查
+ *  失效版本查询：首发逐页改变分页版本；富集改变内容版本，更新 dims
+ *  并在原分页上后台刷新卡片详情（60s 常规轮询兜底）；同步中同时查
  *  任务终态——到 completed/partial 给完成句号（灵动岛 duration 自动收
  *  起），failed 静默。轮询失败静默由下一 tick 重试；存活条件用布尔
  *  （pending 数值每条富集都变，作依赖会反复重启 interval） */

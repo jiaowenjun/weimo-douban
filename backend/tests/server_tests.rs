@@ -2971,6 +2971,192 @@ async fn cache_version_exposes_subjects_pending_and_etag_tracks_it() {
 }
 
 #[tokio::test]
+async fn paging_versions_allow_enrichment_but_reject_record_changes_and_keep_legacy_guards() {
+    let (_dir, state) = setup().await;
+    seed_ok_dimension(
+        &state,
+        Category::Movie,
+        vec![Record {
+            subject_id: "1292052".into(),
+            ..Default::default()
+        }],
+    )
+    .await;
+    let manifest = "/api/v1/users/wenjun30/cache-version?status=collect";
+    let (_, _, before) = conditional_get(&state, manifest, None, None).await;
+    subject::enqueue_missing_subjects(&state.pool, "wenjun30", "movie")
+        .await
+        .unwrap();
+    subject::process_next_job(&state, &fixture_fetcher())
+        .await
+        .unwrap();
+    let (_, _, enriched) = conditional_get(&state, manifest, None, None).await;
+    assert_ne!(before["movie"], enriched["movie"]);
+    for category in ["movie", "all"] {
+        let field = format!("{category}_marks");
+        assert_eq!(before[&field], enriched[&field]);
+        let params = url::form_urlencoded::Serializer::new(String::new())
+            .append_pair("category", category)
+            .append_pair("status", "collect")
+            .append_pair("expand", "subject")
+            .append_pair("cache_version", before[category].as_str().unwrap())
+            .append_pair("paging_version", before[&field].as_str().unwrap())
+            .finish();
+        let (code, _, body) = conditional_get(
+            &state,
+            &format!("/api/v1/users/wenjun30/marks?{params}"),
+            None,
+            None,
+        )
+        .await;
+        assert_eq!(code, StatusCode::OK);
+        assert_eq!(body["items"][0]["subject"]["source"], "rexxar");
+        // Removing the new guard exercises an old client against the new server.
+        let legacy = params.split("&paging_version=").next().unwrap();
+        assert_eq!(
+            conditional_get(
+                &state,
+                &format!("/api/v1/users/wenjun30/marks?{legacy}"),
+                None,
+                None
+            )
+            .await
+            .0,
+            StatusCode::CONFLICT
+        );
+    }
+    let dims_params = url::form_urlencoded::Serializer::new(String::new())
+        .append_pair("category", "movie")
+        .append_pair("status", "collect")
+        .append_pair("cache_version", before["movie"].as_str().unwrap())
+        .append_pair("paging_version", before["movie_marks"].as_str().unwrap())
+        .finish();
+    assert_eq!(
+        conditional_get(
+            &state,
+            &format!("/api/v1/users/wenjun30/subject-dims?{dims_params}"),
+            None,
+            None
+        )
+        .await
+        .0,
+        StatusCode::CONFLICT,
+        "dims must keep its full content guard"
+    );
+    sqlx::query("UPDATE records SET date='2026-11-01' WHERE uid='wenjun30'")
+        .execute(&state.pool)
+        .await
+        .unwrap();
+    for category in ["movie", "all"] {
+        let params = url::form_urlencoded::Serializer::new(String::new())
+            .append_pair("category", category)
+            .append_pair("status", "collect")
+            .append_pair(
+                "paging_version",
+                before[format!("{category}_marks")].as_str().unwrap(),
+            )
+            .finish();
+        assert_eq!(
+            conditional_get(
+                &state,
+                &format!("/api/v1/users/wenjun30/marks?{params}"),
+                None,
+                None
+            )
+            .await
+            .0,
+            StatusCode::CONFLICT
+        );
+    }
+}
+
+#[tokio::test]
+async fn paging_version_checks_record_publication_after_the_read() {
+    // A deterministic handler publishes a change between middleware's two
+    // checks. This exercises the post-read race without timing-dependent sleeps.
+    for change_records in [false, true] {
+        let (_dir, state) = setup().await;
+        seed_ok_dimension(
+            &state,
+            Category::Music,
+            vec![Record {
+                subject_id: "1".into(),
+                ..Default::default()
+            }],
+        )
+        .await;
+        let before = weimo_douban::server::cache::versions(&state, "wenjun30", "collect")
+            .await
+            .unwrap();
+        let pool = state.pool.clone();
+        let app = Router::new()
+            .route("/users/{uid}/marks", axum::routing::get(move || async move {
+                let sql = if change_records {
+                    "UPDATE records SET date='2026-11-01' WHERE uid='wenjun30'"
+                } else {
+                    "INSERT INTO cache_versions(scope,revision) VALUES ('subjects:music',1) ON CONFLICT(scope) DO UPDATE SET revision=revision+1"
+                };
+                sqlx::query(sql).execute(&pool).await.unwrap();
+                axum::Json(json!({"items": []}))
+            }))
+            .layer(axum::middleware::from_fn_with_state(state, weimo_douban::server::cache::middleware));
+        let params = url::form_urlencoded::Serializer::new(String::new())
+            .append_pair("category", "music")
+            .append_pair("status", "collect")
+            .append_pair("cache_version", &before.music)
+            .append_pair("paging_version", &before.music_marks)
+            .finish();
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/users/wenjun30/marks?{params}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            response.status(),
+            if change_records {
+                StatusCode::CONFLICT
+            } else {
+                StatusCode::OK
+            }
+        );
+    }
+}
+
+#[tokio::test]
+async fn manifest_schema_change_does_not_reuse_a_legacy_etag() {
+    use std::hash::{Hash, Hasher};
+    let (_dir, state) = setup().await;
+    let uri = "/api/v1/users/wenjun30/cache-version?status=collect";
+    let (_, _, before) = conditional_get(&state, uri, None, None).await;
+    // Axum's nested middleware sees the /users path.
+    for path in [uri, "/users/wenjun30/cache-version?status=collect"] {
+        let legacy_key = format!(
+            "{}:{}:{}:{}",
+            path,
+            before["all"].as_str().unwrap(),
+            before["profile"].as_str().unwrap(),
+            before["subjects_pending"].as_i64().unwrap()
+        );
+        let mut hash = std::collections::hash_map::DefaultHasher::new();
+        legacy_key.hash(&mut hash);
+        let legacy_tag = format!("W/\"{:x}\"", hash.finish());
+        let (code, headers, body) = conditional_get(&state, uri, Some(&legacy_tag), None).await;
+        assert_eq!(code, StatusCode::OK);
+        assert!(body["music_marks"].is_string());
+        assert_eq!(
+            conditional_get(&state, uri, headers[header::ETAG].to_str().ok(), None)
+                .await
+                .0,
+            StatusCode::NOT_MODIFIED
+        );
+    }
+}
+
+#[tokio::test]
 async fn unchanged_sync_keeps_content_version_and_stable_order() {
     let (_dir, state) = setup().await;
     post_sync(&state, json!({"user":"wenjun30", "categories":["music"]})).await;

@@ -1,20 +1,14 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { Navigate, useParams, useSearchParams } from 'react-router'
 
 import { TextButton } from 'weimo-ui-core/components/text-button'
 
-import type { DoubanMark } from '../api'
 import { DoubanDataQueryError } from '../api'
 import { useDoubanUser } from '../douban-user'
 import { triggerFirstSyncOnce, useFirstSyncPhase } from '../first-sync'
-import {
-  fetchDoubanMarksPage,
-  MarksQueryError,
-  MARKS_PAGE_SIZE,
-  useDoubanDimsQuery,
-  useDoubanMarksPageQuery,
-} from '../douban-queries'
+import { useDoubanDimsQuery } from '../douban-queries'
+import { useMarksList } from '../use-marks-list'
 import { filterIds } from '../facet-engine'
 import { facetPathKey, facetValueLabel, parseFacetPath } from '../facet-model'
 import { MarkCard } from '../mark-card'
@@ -28,17 +22,15 @@ import {
 } from '../navigation'
 import './marks-page.css'
 
-const PAGE_SIZE = MARKS_PAGE_SIZE
-
 /** RFC3339 → YYYY-MM-DD（cached_at 只取日期粒度即可） */
 function formatDate(iso: string): string {
   return iso ? iso.slice(0, 10) : ''
 }
 
 /** 标记列表页：读登录用户的缓存标记（GET /users/{uid}/marks），只读不触发抓取。
- *  数据经 react-query 缓存（同 biji 模式）：首页查询与加载更多的每页
- *  各占独立 key，类别/筛选切回来命中缓存零请求；失败保留已有成功数据，
- *  「重试」走 refetch 强制重发。分面筛选状态在 URL ?facet=dim=value
+ *  全部已加载页订阅同一查询缓存；分页版本保护记录顺序，内容版本仅
+ *  后台刷新详情。筛选集合变化时整体切换，失败保留完整旧列表。
+ *  分面筛选状态在 URL ?facet=dim=value
  *  ——侧边栏筛选树写入、本页读取驱动请求；类别路由切换不带参数，
  *  天然清除筛选 */
 export function MarksPage() {
@@ -76,90 +68,32 @@ export function MarksPage() {
       : null
   const facetKey = facetPathKey(facetPath)
 
-  // 首页标记查询：enabled 保持旧门控（无筛选立即发；有筛选等 dims
-  // 就绪算出命中集再发）；竞态防护由 react-query 内建（按 key 取消旧
-  // 观察），不再需要手写 seqRef
-  const marksQuery = useDoubanMarksPageQuery({
+  const list = useMarksList({
     uid,
     category: marksCategory ?? null,
-    page: 1,
-    ids: matchedIds?.slice(0, PAGE_SIZE),
+    facetKey,
     rating,
-    enabled: uid !== null && marksCategory !== undefined && matchedIds !== null &&
-      matchedIds?.length !== 0 && !dimsQuery.isPlaceholderData,
+    // Unfiltered paging is independent of dims readiness. Filtered replacements
+    // wait for a current projection; the controller retains the complete old list.
+    ids: facetPath.length && dimsQuery.isPlaceholderData ? null : matchedIds,
   })
-
-  // 加载更多累积页（page ≥ 2 的追加数据）：列表身份变化（uid/类别/
-  // 筛选/评分/版本）时按 key 比对清空（render 期调整，模式同旧 snapshot）
-  const listKey =
-    uid && marksCategory
-      ? `${uid}|${marksCategory}|${facetKey}|${rating ?? ''}|${marksQuery.version}`
-      : null
-  const [moreSnapshot, setMoreSnapshot] = useState<{
-    key: string | null
-    pages: DoubanMark[][]
-    loadingMore: boolean
-    moreError: string | null
-  }>({ key: null, pages: [], loadingMore: false, moreError: null })
-  if (moreSnapshot.key !== listKey) {
-    setMoreSnapshot({
-      key: listKey,
-      pages: [],
-      loadingMore: false,
-      moreError: null,
-    })
+  const dimsUnavailable = facetPath.length > 0 && (matchedIds === null || dimsQuery.isPlaceholderData)
+  const dimsError = dimsUnavailable ? dimsQuery.error : null
+  const transientDimsError = dimsError instanceof DoubanDataQueryError &&
+    (dimsError.kind === 'version-stale' || dimsError.kind === 'rate-limited')
+  const state = list.phase === 'loading' && dimsError
+    ? dimsError instanceof DoubanDataQueryError && dimsError.kind === 'not-cached'
+      ? { ...list, phase: 'not-cached' as const }
+      : transientDimsError
+        ? list
+        : { ...list, phase: 'error' as const, error: dimsError.message }
+    : list.phase === 'list' && dimsError && !transientDimsError
+      ? { ...list, error: dimsError.message }
+      : list
+  const retry = () => {
+    if (dimsUnavailable) void dimsQuery.refetch()
+    list.retry()
   }
-
-  // 列表态由「首页查询结果 + 追加页」派生，不再持有独立状态机
-  const first = matchedIds?.length === 0
-    ? { ok: true as const, data: { items: [], total: 0, cached_at: '' } }
-    : marksQuery.data
-  const state:
-    | { phase: 'loading' }
-    | { phase: 'not-cached' }
-    | { phase: 'error'; message: string }
-    | {
-        phase: 'list'
-        items: DoubanMark[]
-        total: number
-        loadedPages: number
-        cachedAt: string
-      } = !first
-    ? marksQuery.error
-      ? marksQuery.error instanceof MarksQueryError
-        ? marksQuery.error.kind === 'not-cached'
-          ? { phase: 'not-cached' }
-          : // 409 版本已变与 429 限流同为瞬态（富集写库持续触发前者、
-            // 同步高峰请求密集触发后者）：失效版本查询/固定窗口翻页后
-            // 自动重试，这里保持 loading 而非报错；withCachedFallback
-            // 有旧版本数据时 data 已被填充、不会走到该分支
-            marksQuery.error.kind === 'version-stale' ||
-              marksQuery.error.kind === 'rate-limited'
-          ? { phase: 'loading' }
-          : { phase: 'error', message: marksQuery.error.message }
-        : { phase: 'error', message: marksQuery.error.message }
-        : dimsQuery.isError && matchedIds === null
-        ? // 筛选态下 dims 未就绪的门控错误：404 未同步归入 not-cached
-          // （首登自动同步对其生效——带筛选落地 /movie 的用户先撞到的
-          // 就是这条路）；409 与 429 同为瞬态保持 loading，其余才算
-          // 加载失败
-          dimsQuery.error instanceof DoubanDataQueryError &&
-            dimsQuery.error.kind === 'not-cached'
-          ? { phase: 'not-cached' }
-          : dimsQuery.error instanceof DoubanDataQueryError &&
-              (dimsQuery.error.kind === 'version-stale' ||
-                dimsQuery.error.kind === 'rate-limited')
-            ? { phase: 'loading' }
-            : { phase: 'error', message: dimsQuery.error.message }
-        : { phase: 'loading' }
-    : {
-          phase: 'list',
-          items: [...first.data.items, ...moreSnapshot.pages.flat()],
-          // ids 模式后端 total 是当页片数，命中总数以前端筛选结果为准
-          total: matchedIds ? matchedIds.length : first.data.total,
-          loadedPages: 1 + moreSnapshot.pages.length,
-          cachedAt: first.data.cached_at,
-        }
 
   // 未填 ID 进入内容页：自动弹一次豆瓣 ID 对话框。ref 守卫保证每个页面
   // 实例只弹一次——关掉后仍可点占位区「输入豆瓣 ID」手动打开，类别切换
@@ -181,44 +115,6 @@ export function MarksPage() {
     if (state.phase !== 'not-cached' || !uid) return
     triggerFirstSyncOnce(uid)
   }, [state.phase, uid])
-
-  async function loadMore() {
-    if (
-      !uid ||
-      !marksCategory ||
-      state.phase !== 'list' ||
-      moreSnapshot.loadingMore ||
-      marksQuery.isPlaceholderData
-    ) {
-      return
-    }
-    const capturedKey = listKey
-    const nextPage = state.loadedPages + 1
-    setMoreSnapshot((s) =>
-      s.key === capturedKey ? { ...s, loadingMore: true, moreError: null } : s,
-    )
-    const result = await fetchDoubanMarksPage({
-      uid,
-      category: marksCategory,
-      page: nextPage,
-      ids: matchedIds?.slice((nextPage - 1) * PAGE_SIZE, nextPage * PAGE_SIZE),
-      rating,
-      version: marksQuery.version,
-    })
-    setMoreSnapshot((s) => {
-      // 期间类别/筛选已切换：丢弃迟到页（对齐旧 seqRef 竞态防护）
-      if (s.key !== capturedKey) return s
-      if (result.ok) {
-        return {
-          ...s,
-          pages: [...s.pages, result.data.items],
-          loadingMore: false,
-          moreError: null,
-        }
-      }
-      return { ...s, loadingMore: false, moreError: result.message }
-    })
-  }
 
   if (!view) {
     return <Navigate replace to={DEFAULT_MARKS_PATH} />
@@ -264,12 +160,9 @@ export function MarksPage() {
   } else if (state.phase === 'error') {
     content = (
       <div className="marks-page__placeholder">
-        <p>加载失败：{state.message}</p>
+        <p>加载失败：{state.error}</p>
         <TextButton
-          onClick={() => {
-            if (matchedIds === null || dimsQuery.isPlaceholderData) void dimsQuery.refetch()
-            else void marksQuery.refetch()
-          }}
+          onClick={retry}
           type="button"
           variant="ghost"
         >
@@ -303,21 +196,21 @@ export function MarksPage() {
             <MarkCard key={mark.comment_id || mark.subject_id} mark={mark} />
           ))}
         </ul>
-        {hasMore ? (
+        {hasMore || state.error ? (
           <div className="marks-page__more">
-            {moreSnapshot.moreError ? (
+            {state.error ? (
               <span className="marks-page__more-error">
-                {moreSnapshot.moreError}
+                {state.error}
               </span>
             ) : null}
             <TextButton
-              disabled={moreSnapshot.loadingMore || marksQuery.isPlaceholderData}
-              onClick={loadMore}
+              disabled={!state.error && (list.loadingMore || !list.canLoadMore)}
+              onClick={state.error ? retry : list.loadMore}
               type="button"
             >
-              {moreSnapshot.loadingMore
+              {!state.error && list.loadingMore
                 ? '加载中…'
-                : `加载更多（${state.items.length}/${state.total}）`}
+                : state.error ? '重试' : `加载更多（${state.items.length}/${state.total}）`}
             </TextButton>
           </div>
         ) : null}

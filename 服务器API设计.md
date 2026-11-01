@@ -319,7 +319,11 @@ GET /api/v1/users/{uid}/marks?category=movie&status=collect&page=1&page_size=50
 |---|---|
 | `category` / `status` | 必填，单维度查询 |
 | `page` / `page_size` | 默认 1 / 50，page_size 上限 200 |
+| `cache_version` | 可选，旧协议完整内容版本；不传 `paging_version` 时读前、读后校验 |
+| `paging_version` | 可选，新协议分页版本；仅 marks 支持，提供时优先于 `cache_version`，只校验 records/维度可用性，允许 subject 详情继续变化 |
 | `fresh` | `cached_at` 是否仍在 TTL 内 |
+
+版本来自 `GET /api/v1/users/{uid}/cache-version?status=collect`：原有 `profile/stats/movie/book/music/all` 保持内容版本含义，新增 `movie_marks/book_marks/music_marks/all_marks` 用于 marks 分页。新版客户端同时发送对应的 `cache_version` 和 `paging_version`，兼容忽略未知参数的旧后端；缺少新字段则回退旧协议。分页版本在读取前后变化均返回 `409 CACHE_VERSION_CHANGED`，调用方应重取版本并重建完整分页范围，不能只重试尾页后拼接旧前缀。新协议不保证所有 subject 详情属于同一内容快照；详情新鲜度由内容版本驱动后台刷新。`subject-dims` 继续校验完整 `cache_version`。
 
 缓存未命中：`404 DIMENSION_NOT_CACHED`，响应体附引导：
 

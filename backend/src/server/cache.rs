@@ -38,6 +38,12 @@ pub struct Versions {
     pub book: String,
     pub music: String,
     pub all: String,
+    /// Paging guards exclude subject enrichment; the original fields still
+    /// describe content freshness and serve clients using cache_version.
+    pub movie_marks: String,
+    pub book_marks: String,
+    pub music_marks: String,
+    pub all_marks: String,
     /// 富集待处理 job 数（queued+running，全局）——前端据此在同步终态
     /// 后维持高频版本轮询（富集逐条落库持续可见），pending 归零自动停
     pub subjects_pending: i64,
@@ -83,6 +89,10 @@ pub async fn versions(state: &AppState, uid: &str, status: &str) -> AppResult<Ve
         book: format!("{base}-{}-{}", marks[1], subjects[1]),
         music: format!("{base}-{}-{}", marks[2], subjects[2]),
         all: format!("{base}-{:?}-{:?}", marks, subjects),
+        movie_marks: format!("{base}-m{}", marks[0]),
+        book_marks: format!("{base}-m{}", marks[1]),
+        music_marks: format!("{base}-m{}", marks[2]),
+        all_marks: format!("{base}-m{:?}", marks),
         subjects_pending,
     })
 }
@@ -103,6 +113,16 @@ fn version_for<'a>(
             _ => None,
         },
         "cache-version" => Some(&versions.all),
+        _ => None,
+    }
+}
+
+fn paging_version_for<'a>(versions: &'a Versions, category: Option<&str>) -> Option<&'a str> {
+    match category {
+        Some("movie") => Some(&versions.movie_marks),
+        Some("book") => Some(&versions.book_marks),
+        Some("music") => Some(&versions.music_marks),
+        Some("all") => Some(&versions.all_marks),
         _ => None,
     }
 }
@@ -179,8 +199,21 @@ pub async fn middleware(State(state): State<AppState>, req: Request<Body>, next:
     };
     // Paging against an obsolete index must retry using the new manifest. Check
     // both sides of the read so a publication during SQL assembly cannot mix pages.
-    let expected = params.get("cache_version");
-    if expected.is_some_and(|expected| expected != version) {
+    // New clients send both guards. Old servers still enforce cache_version;
+    // new servers use only paging_version for marks, allowing live details to
+    // change without invalidating an unchanged record sequence.
+    let paging = endpoint == "marks" && params.contains_key("paging_version");
+    let expected = params.get(if paging {
+        "paging_version"
+    } else {
+        "cache_version"
+    });
+    let guarded_version = if paging {
+        paging_version_for(&v, category)
+    } else {
+        Some(version)
+    };
+    if expected.is_some_and(|expected| Some(expected.as_str()) != guarded_version) {
         return changed_response();
     }
     if endpoint == "marks" {
@@ -190,7 +223,12 @@ pub async fn middleware(State(state): State<AppState>, req: Request<Body>, next:
                 Ok(current) => current,
                 Err(e) => return e.into_response(),
             };
-            if Some(expected.as_str()) != version_for(&current, &endpoint, category) {
+            let current_version = if paging {
+                paging_version_for(&current, category)
+            } else {
+                version_for(&current, &endpoint, category)
+            };
+            if Some(expected.as_str()) != current_version {
                 return changed_response();
             }
         }
@@ -200,7 +238,7 @@ pub async fn middleware(State(state): State<AppState>, req: Request<Body>, next:
         // pending 掺进 ETag：job 入队不 bump revision（触发器只盯内容），
         // 缺了它 pending 变化会被 304 吞掉，前端感知不到轮询该续/该停
         format!(
-            "{}:{}:{}:{}",
+            "manifest-v2:{}:{}:{}:{}",
             req.uri(),
             v.all,
             v.profile,
