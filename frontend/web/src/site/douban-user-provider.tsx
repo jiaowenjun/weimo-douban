@@ -4,6 +4,7 @@ import type { ReactNode } from 'react'
 import { queryClient } from '../query-client'
 import { clearPersistedQueryCache } from '../query-persistence'
 import { CacheVersionContext } from './cache-version'
+import { FirstSyncPollingBridge } from './first-sync'
 import {
   DOUBAN_UID_STORAGE_KEY,
   DoubanUserContext,
@@ -81,7 +82,12 @@ export function DoubanUserProvider({ children }: { children: ReactNode }) {
 
   return (
     <DoubanUserContext.Provider value={value}>
-      <CacheVersionContext.Provider value={versions}>{children}</CacheVersionContext.Provider>
+      <CacheVersionContext.Provider value={versions}>
+        {/* 首发同步生命周期轮询（全局唯一实例，需读 CacheVersionContext
+            的 pending 信号，故挂 Provider 内侧） */}
+        <FirstSyncPollingBridge uid={uid} />
+        {children}
+      </CacheVersionContext.Provider>
       <LoginDialog onOpenChange={setLoginOpen} open={loginOpen} />
     </DoubanUserContext.Provider>
   )

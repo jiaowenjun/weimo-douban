@@ -9,30 +9,6 @@
   font-size: var(--font-size-sm);
 }
 
-/* 首发同步进行中横幅（列表态顶部）：已同步部分即时展示时的进行时提
-   示；任务终态换 done 修饰类给「同步完成」句号，随后自动淡出收起 */
-.marks-page__syncing {
-  margin: 0;
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-sm);
-}
-
-/* 完成态横幅的整生命周期动画：全显 ~2s 后 0.4s 淡出；JS 侧同时长
-   setTimeout（2.4s）播完卸载元素，动画与时序单一来源对齐 */
-.marks-page__syncing--done {
-  animation: marks-page-syncing-fade 2.4s ease forwards;
-}
-
-@keyframes marks-page-syncing-fade {
-  0%,
-  84% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-  }
-}
-
 /* 空态占位卡：文案与按钮整体居中（短文案 + 居中 CTA 的空态惯例） */
 .marks-page__placeholder {
   display: grid;

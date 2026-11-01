@@ -1,19 +1,14 @@
-import { useContext, useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { Navigate, useParams, useSearchParams } from 'react-router'
 
 import { TextButton } from 'weimo-ui-core/components/text-button'
 
 import type { DoubanMark } from '../api'
-import {
-  DoubanDataQueryError,
-  fetchDoubanSyncTask,
-  triggerDoubanFirstSync,
-} from '../api'
+import { DoubanDataQueryError } from '../api'
 import { useDoubanUser } from '../douban-user'
-import { CacheVersionContext } from '../cache-version'
+import { triggerFirstSyncOnce, useFirstSyncPhase } from '../first-sync'
 import {
-  doubanQueryKeys,
   fetchDoubanMarksPage,
   MarksQueryError,
   MARKS_PAGE_SIZE,
@@ -31,73 +26,9 @@ import {
   ratingFilterLabel,
   resolveMarksView,
 } from '../navigation'
-import { queryClient } from '../../query-client'
 import './marks-page.css'
 
 const PAGE_SIZE = MARKS_PAGE_SIZE
-
-/** 首发同步会话级状态（跨导航存活）：uid → 进度。triggering=POST 进行
- *  中；syncing=任务运行中（携带 task_id 供轮询，percent 随轮询回填）；
- *  done=任务到终态（completed/partial），完成横幅「共 N 条」展示中，
- *  2.4s 后自动转 dismissed；dismissed=横幅已收起（含 failed 终态，静
- *  默收起不打扰）；failed=触发失败（回落手动指引文案）。重复触发本身
- *  无害（后端 single-flight 并入运行中任务），会话级去重只为避免每次
- *  导航到未同步视图都发一次 POST；刷新页面后 Map 清空重触发亦安全 */
-type FirstSync =
-  | { phase: 'triggering' }
-  | { phase: 'syncing'; taskId: string; percent?: number }
-  | { phase: 'done'; items: number }
-  | { phase: 'dismissed' }
-  | { phase: 'failed' }
-
-/** Map 是模块级可变源，组件须经 useSyncExternalStore 订阅读取——render
- *  期直读会被 React Compiler 按 uid 记忆化，异步回填后重渲染拿的是
- *  缓存值（横幅/引导文案不切换的根因） */
-const firstSyncState = new Map<string, FirstSync>()
-const firstSyncListeners = new Set<() => void>()
-
-/** 运行中任务的跨 reload 恢复源：直写渐进后维度一入队 marks 即 200
- *  （可能空列表），not-cached 触发窗口随之消失——刷新/导航回来的新
- *  页面实例须靠它恢复 syncing 态（带 taskId 即可重启轮询，终态自然
- *  收敛）；sessionStorage 的会话级语义与 Map 天然同生命周期 */
-const FIRST_SYNC_TASK_KEY = 'weimo-douban:first-sync-task'
-
-function persistFirstSyncTask(uid: string, taskId: string | null) {
-  try {
-    if (taskId) sessionStorage.setItem(FIRST_SYNC_TASK_KEY, JSON.stringify({ uid, taskId }))
-    else sessionStorage.removeItem(FIRST_SYNC_TASK_KEY)
-  } catch {
-    // 存储不可用仅丢失跨刷新恢复，会话内链路不受影响
-  }
-}
-
-function restoreFirstSyncTask() {
-  try {
-    const raw = sessionStorage.getItem(FIRST_SYNC_TASK_KEY)
-    if (!raw) return
-    const parsed = JSON.parse(raw) as { uid?: unknown; taskId?: unknown }
-    if (typeof parsed.uid === 'string' && typeof parsed.taskId === 'string') {
-      firstSyncState.set(parsed.uid, { phase: 'syncing', taskId: parsed.taskId })
-    }
-  } catch {
-    // 畸形存储按无恢复源处理
-  }
-}
-restoreFirstSyncTask()
-
-function setFirstSync(uid: string, value: FirstSync) {
-  firstSyncState.set(uid, value)
-  persistFirstSyncTask(uid, value.phase === 'syncing' ? value.taskId : null)
-  for (const notify of firstSyncListeners) notify()
-}
-
-function subscribeFirstSync(notify: () => void) {
-  firstSyncListeners.add(notify)
-  return () => firstSyncListeners.delete(notify)
-}
-
-/** 后端任务终态（TERMINAL_STATUSES 同款）：到任一终态即停止轮询 */
-const SYNC_TASK_TERMINAL = new Set(['completed', 'partial', 'failed'])
 
 /** RFC3339 → YYYY-MM-DD（cached_at 只取日期粒度即可） */
 function formatDate(iso: string): string {
@@ -205,11 +136,10 @@ export function MarksPage() {
           ? { phase: 'loading' }
           : { phase: 'error', message: marksQuery.error.message }
         : { phase: 'error', message: marksQuery.error.message }
-      : dimsQuery.isError && matchedIds === null
+        : dimsQuery.isError && matchedIds === null
         ? // 筛选态下 dims 未就绪的门控错误：404 未同步归入 not-cached
           // （首登自动同步对其生效——带筛选落地 /movie 的用户先撞到的
-          // 就是这条路）；409 同为瞬态保持 loading，
-          // 其余才算加载失败
+          // 就是这条路）；409 同为瞬态保持 loading，其余才算加载失败
           dimsQuery.error instanceof DoubanDataQueryError &&
             dimsQuery.error.kind === 'not-cached'
           ? { phase: 'not-cached' }
@@ -237,91 +167,16 @@ export function MarksPage() {
     if (!uid) openLogin()
   }, [uid, openLogin])
 
-  // 首发同步：数据未同步（not-cached）时自动触发一次自助全量同步，
-  // 成功后转 syncing（携带 task_id）；进度经 useSyncExternalStore 订阅
-  // 会话级 Map（uid 天然隔离，无切号重置）；触发失败本会话不自动重试
-  // （刷新页面重走一次）
-  const syncPhase = useSyncExternalStore(
-    subscribeFirstSync,
-    () => (uid ? firstSyncState.get(uid) : undefined),
-    () => undefined,
-  )
+  // 首发同步：数据未同步（not-cached）时自动触发一次自助全量同步（幂
+  // 等：会话级守卫在后端 single-flight 之外再挡重复 POST）；进度展示
+  // 与生命周期轮询已上移——灵动岛通知挂 App 层（TopBarSyncNotice）、
+  // 轮询桥挂 DoubanUserProvider（FirstSyncPollingBridge），本页只消费
+  // 状态驱动引导文案
+  const syncPhase = useFirstSyncPhase(uid)
   useEffect(() => {
     if (state.phase !== 'not-cached' || !uid) return
-    if (firstSyncState.has(uid)) return
-    setFirstSync(uid, { phase: 'triggering' })
-    void triggerDoubanFirstSync(uid).then((task) => {
-      setFirstSync(
-        uid,
-        task ? { phase: 'syncing', taskId: task.task_id } : { phase: 'failed' },
-      )
-    })
+    triggerFirstSyncOnce(uid)
   }, [state.phase, uid])
-
-  // 同步中双轮询（3s）：失效版本查询让首发直写的每页落库尽快可见
-  // （revision bump → 版本 key 变化 → 数据查询自动重拉；60s 常规轮询
-  // 兜底），同时查任务终态——到终态停轮询收起横幅；终态后富集未清
-  // （versions.subjects_pending>0，旧后端无字段按 0）仍维持 3s 版本轮
-  // 询——富集逐条落库（评分/年份回填）持续可见，pending 归零自动停。
-  // 轮询失败静默由下一 tick 重试（会话级短生命周期，任务过期清理等
-  // 场景无谓报错）；存活条件用布尔（pending 数值每条富集都变，作依赖
-  // 会反复重启 interval）
-  const syncTaskId = syncPhase?.phase === 'syncing' ? syncPhase.taskId : null
-  const versions = useContext(CacheVersionContext)
-  const keepPolling = syncTaskId !== null || (versions?.subjects_pending ?? 0) > 0
-  useEffect(() => {
-    if (!keepPolling || !uid) return
-    let stopped = false
-    const timer = setInterval(() => {
-      if (stopped) return
-      void queryClient.invalidateQueries({
-        queryKey: [...doubanQueryKeys.uid(uid), 'versions'],
-      })
-      if (!syncTaskId) return
-      void fetchDoubanSyncTask(syncTaskId)
-        .then((task) => {
-          if (stopped) return
-          const current = firstSyncState.get(uid)
-          if (SYNC_TASK_TERMINAL.has(task.status)) {
-            if (current?.phase === 'syncing') {
-              // 终态时刻维度数据已全部定格：立即补一次版本失效，让最后
-              // 几页落库尽快拉全（完成横幅报「共 N 条」时列表尽量对齐）
-              void queryClient.invalidateQueries({
-                queryKey: [...doubanQueryKeys.uid(uid), 'versions'],
-              })
-              // completed/partial 给完成句号（items_count=已获取条数）；
-              // failed 静默收起——无数据走手动指引，有部分数据也不庆祝
-              setFirstSync(
-                uid,
-                task.status === 'failed'
-                  ? { phase: 'dismissed' }
-                  : { phase: 'done', items: Math.max(0, task.items_count) },
-              )
-            }
-          } else if (
-            current?.phase === 'syncing' &&
-            current.percent !== (task.percent ?? undefined)
-          ) {
-            setFirstSync(uid, { ...current, percent: task.percent ?? undefined })
-          }
-        })
-        .catch(() => {})
-    }, 3_000)
-    return () => {
-      stopped = true
-      clearInterval(timer)
-    }
-  }, [keepPolling, syncTaskId, uid])
-
-  // 完成横幅的收起时序：全显 ~2s 后随 CSS 动画淡出（共 2.4s），动画
-  // 播完卸载元素进入会话终态；items 是 done 态的稳定标识（effect 只在
-  // 进入/离开 done 时重跑，StrictMode 双跑被 cleanup 清理，幂等）
-  const doneItems = syncPhase?.phase === 'done' ? syncPhase.items : null
-  useEffect(() => {
-    if (doneItems === null || !uid) return
-    const timer = setTimeout(() => setFirstSync(uid, { phase: 'dismissed' }), 2_400)
-    return () => clearTimeout(timer)
-  }, [doneItems, uid])
 
   async function loadMore() {
     if (
@@ -383,15 +238,13 @@ export function MarksPage() {
     content = <div className="marks-page__placeholder">加载中…</div>
   } else if (state.phase === 'not-cached') {
     // 首发同步引导（首批数据到达前）：触发中/同步中给自动同步引导，
-    // 触发失败回落手动指引；首批页落库后转列表态，同步横幅接管进度展示
+    // 触发失败回落手动指引；首批页落库后转列表态，进度/完成句号由顶栏
+    // 灵动岛通知展示（TopBarSyncNotice，全局可见）
     content =
       syncPhase?.phase === 'triggering' || syncPhase?.phase === 'syncing' ? (
         <div className="marks-page__placeholder">
           <p>
             首次使用：正在从豆瓣同步 {profile?.username || uid} 的标记。
-          </p>
-          <p className="marks-page__hint">
-            已同步的条目会陆续自动展示，无需手动刷新。
           </p>
         </div>
       ) : (
@@ -428,16 +281,6 @@ export function MarksPage() {
     // 「· 我的N星标记」
     content = (
       <>
-        {syncPhase?.phase === 'syncing' ? (
-          <p className="marks-page__syncing">
-            {`正在从豆瓣同步其余标记${syncPhase.percent != null ? `（${syncPhase.percent}%）` : ''}，已同步部分即时展示`}
-          </p>
-        ) : null}
-        {syncPhase?.phase === 'done' ? (
-          <p className="marks-page__syncing marks-page__syncing--done">
-            {`同步完成，共 ${syncPhase.items} 条`}
-          </p>
-        ) : null}
         <p className="marks-page__meta">
           {profile?.username || uid}
           {realCategory
