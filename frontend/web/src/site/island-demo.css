@@ -1,0 +1,151 @@
+/* 灵动岛遮挡改善方案对比演示（#/island-demo）：页面布局 + v1/v2/v3
+   三套变体的顶栏效果。方案开关键于 #root[data-island-demo]（页面按
+   选择写入），与生产拟采用的 :has(.top-bar-notice[data-visible])
+   选择器机制同构——演示页验证的就是生产机制本身 */
+
+.island-demo {
+  display: grid;
+  gap: 16px;
+  padding-block: 4px 32px;
+}
+
+.island-demo__hint {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: 1.6;
+}
+
+.island-demo__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 10px;
+}
+
+.island-demo__card {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid hsl(0 0% 50% / 0.25);
+  border-radius: 12px;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 160ms ease, background-color 160ms ease;
+}
+
+.island-demo__card[aria-checked='true'] {
+  border-color: hsl(142 71% 45% / 0.8);
+  background: hsl(142 71% 45% / 0.08);
+}
+
+.island-demo__card-name {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.island-demo__card-summary {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+}
+
+.island-demo__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.island-demo__control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-sm);
+}
+
+/* —— v1 让位避让：岛可见时前置标题渐隐让路（内容绕开岛，岛主权
+   不动）；岛收起后标题延迟回弹——transition-delay 留足收拢退场
+   （transform 260ms + 余量），否则标题在岛缩回途中弹回又撞一次。
+   隐藏方向 delay 归零即时让位 */
+.island-demo-leading {
+  transition: opacity 240ms ease 320ms;
+}
+
+#root[data-island-demo='v1']:has(.top-bar-notice[data-visible='true']) .island-demo-leading {
+  opacity: 0;
+  transition-delay: 0ms;
+}
+
+/* —— v2 渐变模糊光晕：岛外包装层上两层伪元素，径向 ring 掩码限定
+   只在岛周边（环外渐出、岛身留空），近岛大模糊+外围小模糊+极淡
+   灰晕（渐变提亮），离岛越近越糊越蒙。掩码 backdrop-filter 在
+   Chromium/WebView2 稳定，WKWebView 需 -webkit- 前缀双写 */
+.island-demo-halo-host {
+  position: relative;
+  display: inline-flex;
+}
+
+.island-demo-halo-host::before,
+.island-demo-halo-host::after {
+  content: '';
+  position: absolute;
+  inset: -16px;
+  border-radius: 999px;
+  pointer-events: none;
+  z-index: -1;
+}
+
+.island-demo-halo-host::before {
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  -webkit-mask-image: radial-gradient(
+    closest-side, transparent 46%, #000 58%, #000 74%, transparent 100%
+  );
+  mask-image: radial-gradient(
+    closest-side, transparent 46%, #000 58%, #000 74%, transparent 100%
+  );
+}
+
+.island-demo-halo-host::after {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  background: radial-gradient(closest-side, hsl(0 0% 50% / 0.12), transparent 80%);
+  -webkit-mask-image: radial-gradient(
+    closest-side, transparent 38%, #000 50%, #000 88%, transparent 100%
+  );
+  mask-image: radial-gradient(
+    closest-side, transparent 38%, #000 50%, #000 88%, transparent 100%
+  );
+}
+
+/* 岛收起后光晕必须一并消失：岛 children 置空仅自身 opacity 0，外层
+   host 与伪元素仍在原位——不挂可见性门会在标题上留下一条压暗雾带
+   （实测踩坑）。content: none 连伪元素盒一起摘除 */
+#root[data-island-demo='v2']:not(:has(.top-bar-notice[data-visible='true']))
+  .island-demo-halo-host::before,
+#root[data-island-demo='v2']:not(:has(.top-bar-notice[data-visible='true']))
+  .island-demo-halo-host::after {
+  content: none;
+}
+
+/* —— v3 下移悬浮：岛可见时整体降到顶栏下方悬浮（外包装层做位移，
+   不与岛自身 scale 进出场动画打架）。演示为可见即恒降；生产版按
+   实测避让（无遮挡不偏移）。translateY 百分比基准是岛高非栏高，
+   24px 补足到栏缘外约 14px 呼吸距（实测 14px 只剩 4px 太贴） */
+.island-demo-drop-host {
+  position: relative;
+  display: inline-flex;
+  transition: transform 320ms cubic-bezier(0.34, 1.2, 0.64, 1);
+}
+
+#root[data-island-demo='v3']:has(.top-bar-notice[data-visible='true']) .island-demo-drop-host {
+  transform: translateY(calc(100% + 24px));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .island-demo-leading,
+  .island-demo-drop-host {
+    transition-duration: 1ms;
+  }
+}

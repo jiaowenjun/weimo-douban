@@ -9,6 +9,11 @@ import {
   parseFacetPath,
 } from './site/facet-model'
 import {
+  IslandDemoLeading,
+  IslandDemoNotice,
+  IslandDemoPage,
+} from './site/island-demo'
+import {
   CATEGORY_NOUNS,
   DEFAULT_MARKS_PATH,
   resolveMarksView,
@@ -65,9 +70,12 @@ function SiteShell() {
   const { pathname } = useLocation()
   const view = useMarksViewFromLocation()
   const topBarLeading = useFacetBreadcrumb()
+  // 灵动岛遮挡方案对比页（#/island-demo）：顶栏三槽全换演示件
+  // （岛/前置标题），document.title 与正常页同构
+  const isDemoRoute = pathname === '/island-demo'
   // 「动词过的类别名」三类别统一（看过的影视/读过的图书/听过的音乐），
   // 始终驱动 document.title
-  const pageTitle = view?.pageTitle
+  const pageTitle = view?.pageTitle ?? (isDemoRoute ? '岛对比' : undefined)
 
   // 根路径 = 欢迎页（营销页）：自带 MiniSiteTemplate 独立壳（无侧边栏、
   // hero 标题区），不套 SiteTemplate 应用壳。分支置于全部 hooks 之后——
@@ -88,13 +96,14 @@ function SiteShell() {
           <TopBarExport />
         </>
       }
-      topBarCenter={<TopBarSyncNotice />}
-      topBarLeading={topBarLeading}
+      topBarCenter={isDemoRoute ? <IslandDemoNotice /> : <TopBarSyncNotice />}
+      topBarLeading={isDemoRoute ? <IslandDemoLeading /> : topBarLeading}
     >
       <Routes>
         {/* 静态段优先于动态 /:category，react-router 按具体度排序匹配。
             设置已改为弹层对话框（SiteSettingsProvider 挂载），/settings
             仅留重定向兜底旧书签/历史记录 */}
+        <Route element={<IslandDemoPage />} path="/island-demo" />
         <Route
           element={<Navigate replace to={DEFAULT_MARKS_PATH} />}
           path="/settings"
