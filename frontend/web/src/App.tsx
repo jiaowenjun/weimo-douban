@@ -9,8 +9,10 @@ import {
   parseFacetPath,
 } from './site/facet-model'
 import {
+  ALL_MARKS_TAG,
   CATEGORY_NOUNS,
   DEFAULT_MARKS_PATH,
+  parseRatingParam,
   resolveMarksView,
 } from './site/navigation'
 import { TopBarExport } from './site/marks-export'
@@ -20,12 +22,18 @@ import { TopBarSyncNotice } from './site/top-bar-sync-notice'
 import { SiteSettingsProvider } from './site/site-settings-provider'
 import { SiteSidebar } from './site/site-sidebar'
 
-/** 从 /:category 路径解析导航高亮项与顶栏标题 */
+/** 从 /:category 路径解析导航高亮项与顶栏标题；all 视图带评分筛选
+ *  （?rating=）时标题随评分子导航项（如五星力荐） */
 function useMarksViewFromLocation() {
   const { pathname } = useLocation()
+  const [searchParams] = useSearchParams()
   const [, category] = pathname.split('/')
+  // 评分参数仅 all 视图合法，非法值按无筛选处理（列表页同口径）
+  const rating = category === ALL_MARKS_TAG
+    ? parseRatingParam(searchParams.get('rating'))
+    : undefined
 
-  return resolveMarksView(category)
+  return resolveMarksView(category, rating)
 }
 
 /** 顶栏前置区：真实类别页常显标签面包屑「类别名/步骤值…」（无筛选
@@ -65,7 +73,8 @@ function SiteShell() {
   const view = useMarksViewFromLocation()
   const topBarLeading = useFacetBreadcrumb()
   // 「动词过的类别名」三类别统一（看过的影视/读过的图书/听过的音乐），
-  // 始终驱动 document.title
+  // all 视图评分筛选中为评分子导航项名（如五星力荐）；始终驱动
+  // document.title
   const pageTitle = view?.pageTitle
 
   // 根路径 = 欢迎页（营销页）：自带 MiniSiteTemplate 独立壳（无侧边栏、

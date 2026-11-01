@@ -130,15 +130,19 @@ export type MarksView = {
 }
 
 /** 校验路由参数并派生导航高亮项与页面标题；非法值返回 null。
- *  all 为三类别合并视图（全部标记），无分面维度 */
+ *  all 为三类别合并视图（全部标记），无分面维度；rating 为可选的
+ *  评分筛选键（?rating=，仅 all 视图有此参数）——命中时页面标题换成
+ *  评分子导航项名（如五星力荐），仅标题随动，侧边栏高亮仍走
+ *  selectedTag（ratingNavTag） */
 export function resolveMarksView(
   category: string | undefined,
+  rating?: RatingKey,
 ): MarksView | null {
   if (category === ALL_MARKS_TAG) {
     return {
       activeItemId: ALL_MARKS_TAG,
       category: ALL_MARKS_TAG,
-      pageTitle: '全部标记',
+      pageTitle: rating ? ratingFilterLabel(rating) : '全部标记',
     }
   }
   if (!category || !isMarksCategory(category)) return null
