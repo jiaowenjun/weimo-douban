@@ -9,7 +9,7 @@
 
 ```
 WeimoDoubanNative.app（单进程 + sidecar）
-├─ Swift 原生壳（AppKit，LSUIElement 托盘常驻，SPM 零第三方依赖）
+├─ Swift 原生壳（AppKit，混合形态：窗口在=Dock 常驻，收起=纯托盘，SPM 零第三方依赖）
 │   ├─ NSStatusItem + 菜单（白墨滴模板图标=与 Tauri 版统一，isTemplate 自适配明暗；symbol 回退链兜底）
 │   ├─ NSWindow + WKWebView ← 加载 http://127.0.0.1:<port>/douban/
 │   └─ SyncMonitor：3s 轮询 localhost API → 状态行 + 系统通知
@@ -25,6 +25,11 @@ WeimoDoubanNative.app（单进程 + sidecar）
 
 ## 关键设计
 
+- **混合桌面形态**：窗口可见期间 `.regular`（Dock 图标 + Cmd+Tab + 系统
+  菜单栏，最小主菜单：关于/隐藏/退出），收起（关窗/热键 toggle）回
+  `.accessory`（纯托盘，Dock 图标随消）——比 Tauri 版恒 LSUIElement 更
+  进一步：菜单栏常驻哲学不变，窗口使用期 Dock 可达；Dock 点击重开窗口
+  （applicationShouldHandleReopen）。
 - **数据目录共用**：`~/Library/Application Support/ink.weimo.douban/`
   （Tauri 版同库同 covers，免重抓）。SQLite 使用 WAL，但两版各有抓取
   worker，**两版同时运行仍有写冲突风险**，启动时检测 Tauri 版在

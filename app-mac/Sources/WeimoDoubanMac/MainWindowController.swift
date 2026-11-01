@@ -197,9 +197,18 @@ final class MainWindowController: NSObject, NSWindowDelegate, WKNavigationDelega
         webView.load(URLRequest(url: initialURL))
     }
 
+    /// 混合形态：窗口可见期间 .regular（Dock 图标 + Cmd+Tab + 系统菜单栏），
+    /// 收起回 .accessory（纯托盘）——菜单栏常驻哲学不变，Dock 可达性随窗口
     func show() {
+        NSApp.setActivationPolicy(.regular)
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    /// 收起到托盘：窗口 orderOut + 降回 accessory（Dock 图标随之消失）
+    func hide() {
+        window.orderOut(nil)
+        NSApp.setActivationPolicy(.accessory)
     }
 
     /// 全局快捷键的收起判定：窗口可见 + 是 key window + App 在前台
@@ -208,14 +217,10 @@ final class MainWindowController: NSObject, NSWindowDelegate, WKNavigationDelega
         window.isVisible && window.isKeyWindow && NSApp.isActive
     }
 
-    func hide() {
-        window.orderOut(nil)
-    }
-
-    // MARK: NSWindowDelegate —— 关窗 = 隐藏（托盘常驻）
+    // MARK: NSWindowDelegate —— 关窗 = 收起到托盘（Dock 图标随降回 accessory 消失）
 
     func windowShouldClose(_ sender: NSWindow) -> Bool {
-        sender.orderOut(nil)
+        hide()
         return false
     }
 
@@ -362,7 +367,10 @@ final class MainWindowController: NSObject, NSWindowDelegate, WKNavigationDelega
             menu.addItem(.separator())
             menu.addItem(open)
         }
-        let location = webView.convert(NSEvent.mouseLocation, from: nil)
+        // 屏幕坐标 → 窗口 → 视图两步走：convert(_:from: nil) 吃的是窗口坐标，
+        // 直接喂屏幕点会被窗口原点再偏一次（曾致菜单弹到窗口外）
+        let windowPoint = window.convertPoint(fromScreen: NSEvent.mouseLocation)
+        let location = webView.convert(windowPoint, from: nil)
         menu.popUp(positioning: nil, at: location, in: webView)
     }
 

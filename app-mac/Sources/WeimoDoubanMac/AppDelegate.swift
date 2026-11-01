@@ -44,6 +44,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         warnIfTauriRunning()
         buildStatusItem()
+        buildMainMenu()
 
         // 全局快捷键：注册失败（组合被占）不致命——告警一次，可经托盘菜单重录
         hotKey.onTrigger = { [weak self] in self?.hotkeyTriggered() }
@@ -70,6 +71,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
         true
+    }
+
+    /// 混合形态下 Dock 图标点击 = 重开主窗口（accessory 期间 Dock 不在，
+    /// 此回调只在 .regular + 窗口已收起后短窗口期有意义，兜底无害）
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        showMainWindow()
+        return true
     }
 
     // MARK: - 启动装配
@@ -131,6 +139,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if alert.runModal() == .alertSecondButtonReturn {
             NSApp.terminate(nil)
         }
+    }
+
+    /// 系统主菜单（.regular 形态窗口激活时菜单栏展示；accessory 期间不显示）：
+    /// 最小集——关于（标准面板，bundle 信息）/隐藏/退出
+    private func buildMainMenu() {
+        let mainMenu = NSMenu()
+        let appMenuItem = NSMenuItem()
+        mainMenu.addItem(appMenuItem)
+        let appMenu = NSMenu()
+        appMenuItem.submenu = appMenu
+        appMenu.addItem(
+            withTitle: "关于微墨·豆瓣", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)),
+            keyEquivalent: "")
+        appMenu.addItem(.separator())
+        appMenu.addItem(
+            withTitle: "隐藏微墨·豆瓣", action: #selector(NSApplication.hide(_:)),
+            keyEquivalent: "h")
+        appMenu.addItem(.separator())
+        appMenu.addItem(
+            withTitle: "退出微墨·豆瓣", action: #selector(NSApplication.terminate(_:)),
+            keyEquivalent: "q")
+        NSApp.mainMenu = mainMenu
     }
 
     // MARK: - 托盘
