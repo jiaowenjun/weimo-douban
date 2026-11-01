@@ -121,9 +121,11 @@ sync_gitee() { # $1=tag（如 v0.5.0）
     blob=$(git hash-object -w "$tmp/latest-gitee.json")
     tree=$(printf '100644 blob %s\tlatest.json\n' "$blob" | git mktree)
     commit=$(git commit-tree "$tree" -m "App updater manifest ${tag#v}")
-    git push origin "$commit:refs/heads/app-latest"
-    git push gitee "$commit:refs/heads/app-latest"
-    echo "  · app-latest 清单分支已推送（v${tag#v}）"
+    # 孤儿提交无父祖裔，远端分支不可能 fast-forward，必须 -f（该分支是
+    # 脚本独占的「最新版指针」信道，无并发推送方，强推即正解）
+    git push -f origin "$commit:refs/heads/app-latest"
+    git push -f gitee "$commit:refs/heads/app-latest"
+    echo "  · app-latest 清单分支已强推（v${tag#v}）"
   else
     echo "  !! 本 release 缺 latest.json 资产，跳过 app-latest 分支推送"
   fi
@@ -219,6 +221,9 @@ gh release create "v$VERSION" "${ASSETS[@]}" \
   --notes "微墨·豆瓣桌面 App v${VERSION}（${PLATFORMS}）。已装旧版者经托盘「检查更新」或启动自检自动升级；新安装请下载 dmg（macOS）或 x64-setup.exe（Windows）。"
 echo "==> 发布完成：v${VERSION}（latest.json 已随 release 上传，默认端点即可发现新版本）"
 
-# Gitee 国内镜像：GitHub 已发布，此步失败不影响主流程，可随时补跑
-sync_gitee "v$VERSION" \
+# Gitee 国内镜像：GitHub 已发布，此步失败不影响主流程，可随时补跑。
+# 注意必须以子壳调用——函数直接放 || 右侧会令 set -e 在函数体内整体失效
+# （v0.5.1 实录：push 被拒后仍打印「已推送」），子壳内失败即中止并如实
+# 冒泡非零
+( sync_gitee "v$VERSION" ) \
   || echo "  !! Gitee 镜像未完成；GitHub Release 不受影响，可补跑：./scripts/release.sh --gitee-only v$VERSION"
