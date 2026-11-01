@@ -83,6 +83,8 @@ function SiteShell() {
   if (pathname === '/') return <WelcomePage />
 
   return (
+    // topBarIslandYield 让位避让走 template 内建（0.4.8）；演示路由除外
+    // ——它要保留自包含的基线/v1-v4 对比形态，不吃壳的自动让位
     <SiteTemplate
       pageTitle={pageTitle}
       showSidebarCloseButton={false}
@@ -98,6 +100,7 @@ function SiteShell() {
       }
       topBarCenter={isDemoRoute ? <IslandDemoNotice /> : <TopBarSyncNotice />}
       topBarLeading={isDemoRoute ? <IslandDemoLeading /> : topBarLeading}
+      topBarIslandYield={!isDemoRoute}
     >
       <Routes>
         {/* 静态段优先于动态 /:category，react-router 按具体度排序匹配。

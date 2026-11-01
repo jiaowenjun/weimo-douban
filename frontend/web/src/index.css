@@ -16,35 +16,5 @@
 
 /* 顶栏灵动岛居中于内容区：由 SiteTemplate 壳自动注入
    --top-bar-center-inset（template ≥0.4.7，与 __page-title 越侧栏缩进
-   同断点同公式），本站不再自设覆盖 */
-
-/* 灵动岛让位避让（island-demo v1 采纳）：被岛实测压到的顶栏元素——
-   前置标题胶囊/面包屑包装/侧栏触发钮（左槽直接子级）与右侧钮——挂
-   island-yield 渐隐让路，岛退场后 320ms 延迟回弹（基态 delay 兜住
-   TopBarNotice 收拢退场 260ms）。挂类由 top-bar-sync-notice 的实测
-   遮叠驱动；库元素站点级覆盖与 coss-dialog 同法（未分层压库层） */
-.top-bar__slot--left .weimo-site-template__top-bar-slot > *,
-.top-bar__slot--right button {
-  transition: opacity 240ms ease 320ms;
-}
-
-.top-bar__slot--left .weimo-site-template__top-bar-slot > *.island-yield,
-.top-bar__slot--right button.island-yield {
-  opacity: 0;
-  transition-delay: 0ms;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .top-bar__slot--left .weimo-site-template__top-bar-slot > *,
-  .top-bar__slot--right button {
-    transition-duration: 1ms;
-    transition-delay: 0ms;
-  }
-}
-
-/* 侧栏触发钮零收缩：长面包屑+窄幅时 flex-shrink 按基宽比例分摊把它
-   压成竖椭圆（island-demo 实测 44→28）——站点级兜底，weimo-ui-template
-   出正式 flex:none 后可撤 */
-.weimo-site-template__sidebar-trigger {
-  flex: none;
-}
+   同断点同公式），本站不再自设覆盖。让位避让与触发钮零收缩也已收进
+   template 0.4.8（topBarIslandYield 内建），本站零覆盖 */
