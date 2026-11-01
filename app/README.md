@@ -1,6 +1,6 @@
 # 微墨·豆瓣桌面 App（Tauri，macOS / Windows）
 
-安装包同时附带 `weimo-douban-mcp`，由本地 Agent 按需启动，通过 stdio 只读查询应用数据库。它不随 GUI 启动、不运行同步任务；连接配置与工具说明见 [MCP 接入](../mcp/README.md)。构建钩子会先编译 MCP 再构建前端，`bundle.externalBin` 将对应平台的可执行文件加入安装包。
+安装包同时附带 `weimo-douban-mcp`，由本地 Agent 按需启动，通过 stdio 只读查询应用数据库。它不随 GUI 启动、不运行同步任务；连接配置与工具说明见 [本地 MCP 使用指南](../mcp/local-guide.md)。构建钩子会先编译 MCP 再构建前端，`bundle.externalBin` 将对应平台的可执行文件加入安装包。
 
 方案 B 全栈封装：**Tauri 壳 + 内嵌同步服务器，单进程自足运行**。不依赖
 weimo.ink 也可工作。

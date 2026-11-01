@@ -45,8 +45,8 @@ curl -H 'Authorization: Bearer replace-with-your-token' \
 | 原生 macOS 客户端 | [原生壳开发说明](../app-mac/README.md)，独立实验版本，未包含在当前公开安装包中 |
 | 公开浏览界面 | [前端开发](../frontend/web/README.md) |
 | 管理后台 | [管理后台开发](../frontend/admin/README.md) |
-| 本地 MCP | [工具参数、构建与测试](../mcp/README.md) |
-| 远程 MCP | [连接指南](../mcp/README.md#远程连接无需安装-app) · [独立服务部署与回滚](../ops/mcp/README.md) |
+| 本地 MCP | [使用指南](../mcp/local-guide.md) · [构建与测试](../mcp/README.md#构建与验证) |
+| 远程 MCP | [使用指南](../mcp/remote-guide.md) · [独立服务部署与回滚](../ops/mcp/README.md) |
 
 桌面 App 的构建会同时打包独立 MCP 程序。Agent 按需启动它，通过 stdio 只读访问现有数据库，不启动另一套同步任务。
 

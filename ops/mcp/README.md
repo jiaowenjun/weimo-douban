@@ -1,5 +1,7 @@
 # txy 远程 MCP 运维
 
+使用 AI 助手连接现有服务，请阅读[远程 MCP 使用指南](../../mcp/remote-guide.md)。本页供部署与维护服务时参考。
+
 远程 MCP 使用独立进程 `weimo-douban-mcp-http`，与 8020 同步后端共享只读 SQLite 数据；HTTPS 地址为 `https://weimo.ink/douban/mcp`，内部仅绑定 `127.0.0.1:8021`。它复用本地 MCP 的五个查询工具，不启动 worker、不迁移数据库、不抓取豆瓣。桌面包继续只包含 stdio 二进制。
 
 ## 开放策略
