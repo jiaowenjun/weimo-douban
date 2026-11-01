@@ -27,8 +27,8 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     /// 投递一条通知；首次投递时顺带请求授权（上下文时机比启动即弹更自然，
     /// 拒绝授权则静默降级为日志）
     func post(title: String, body: String) {
+        NSLog("[notify] 投递 %@ | %@", title, body)
         guard isAvailable else {
-            NSLog("[notify] %@ — %@", title, body)
             return
         }
         let center = UNUserNotificationCenter.current()

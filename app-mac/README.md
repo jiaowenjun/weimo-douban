@@ -37,6 +37,16 @@ WeimoDoubanNative.app（单进程 + sidecar）
   浏览器（路线图 1.4）。
 - **CSV 导出 → NSSavePanel**：blob 锚点经 `shouldPerformDownload` →
   WKDownload → 原生保存面板自选位置（路线图 2.1 原生形态）。
+- **原生右键菜单**（路线图 2.2）：右键标记卡片 → 复制标题 / 复制豆瓣
+  链接 / 在豆瓣打开。实现=壳 documentStart 注入 contextmenu 桥脚本
+  （按 `li[data-subject-url]` 属性选择器提取，与 weimo-ui 类名解耦）→
+  `WKScriptMessageHandler`（弱代理切断保留环）→ NSMenu 原生弹出；
+  无卡片上下文不拦截保留 WebKit 默认。**这是唯一动了前端的一处**：
+  MarkCard 根节点挂两个惰性 data 属性（`data-subject-url`/`data-title`，
+  web 端零行为差异）——2.2 在路线图本就属「需页面配合」的过墙项。
+- **同步→通知端到端已真实验证**：临时数据目录 + wenjun30 music collect
+  28 条实测——任务 15s 完成、`[notify] 投递 同步完成 | 共 28 条` 命中、
+  subjects_pending=24 进入「详情拉取中」、marks API 返回真实 subject_url。
 - **通知**（路线图 1.1 路线 i，零后端改动）：SyncMonitor 与前端灵动岛
   同端点同口径——任务 `queued/running → completed/partial/failed` 跃迁、
   `subjects_pending >0 → 0` 跃迁发系统通知，点击唤起主窗口；首帧只建
@@ -82,11 +92,15 @@ curl http://127.0.0.1:<port>/healthz        # {"status":"ok"}（根路径，不�
 - 自动更新：GitHub `latest.json` 属 Tauri 版版本线，与本壳版本不可比；
   分发与更新方案待定（Sparkle 或独立 manifest）后再做
 - 唤起直落搜索（2.3）：等前端搜索功能实现后补一行 evaluateJavaScript
-- 深链接、标题栏一体化（P2/P3，见路线图）
+- 深链接（1.7，无场景暂不排期）
+- **标题栏一体化（3.1）——刻意留待设计迭代**：hidden titlebar + 前端
+  安全区/红绿灯让位是 weimo-ui 双主题顶栏的视觉设计改动，需与 web 端
+  一起 IAB 截图迭代定稿，不适合壳侧自主盲改；drag 区在原生壳无 Tauri
+  的 IPC 限制（evaluateJavaScript/messageHandler 双向通道现成），工程
+  侧无阻塞
 
 ## 已知待实测
 
-- CSV 导出（blob 锚点 → WKDownload → NSSavePanel）在真机上的完整链路；
-  不通则记为缺口，回落方案见路线图 2.1（壳改写 download destination 或
-  页面走桥接）。
+- CSV 导出（blob 锚点 → WKDownload → NSSavePanel）与右键菜单交互：
+  需真实数据 + GUI 操作，留给用户核验（同步→通知链路已自动验证）。
 - ad-hoc 签名下系统通知权限登记行为（首次发通知时请求授权）。

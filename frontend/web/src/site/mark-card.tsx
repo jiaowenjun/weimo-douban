@@ -382,7 +382,14 @@ export function MarkCard({ mark }: MarkCardProps) {
     )
 
   return (
-    <li className={getCardSurfaceClassName('mark-card')} data-expanded={metaExpanded ? 'true' : 'false'}>
+    <li
+      className={getCardSurfaceClassName('mark-card')}
+      data-expanded={metaExpanded ? 'true' : 'false'}
+      /* mac 原生壳右键菜单取条目豆瓣链接/标题用（app-mac 注入脚本按
+         li[data-subject-url] 提取）——纯惰性数据属性，web 端零行为差异 */
+      data-subject-url={mark.subject_url}
+      data-title={mark.title}
+    >
       <div className="mark-card__header">
         {/* 日期·动词·星级必须同在一个 span 内：顶栏是 grid，散写的
             文本节点/元素会成为独立 grid 项被自动布局错位 */}

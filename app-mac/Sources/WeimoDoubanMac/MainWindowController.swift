@@ -10,7 +10,28 @@ import WebKit
 /// - 导航策略：仅放行 127.0.0.1 同源；外链交系统默认浏览器（路线图 1.4）；
 ///   CSV 导出（blob 锚点）经 shouldPerformDownload → WKDownload → NSSavePanel
 ///   原生保存面板（路线图 2.1 的原生形态）
-final class MainWindowController: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUIDelegate, WKDownloadDelegate {
+final class MainWindowController: NSObject, NSWindowDelegate, WKNavigationDelegate, WKUIDelegate, WKDownloadDelegate, WKScriptMessageHandler {
+
+    /// contextmenu 桥脚本（路线图 2.2）：右键落在标记卡片上（前端 MarkCard
+    /// 根节点惰性携带 data-subject-url/data-title，纯属性 web 端零行为差异）
+    /// 拦截默认菜单并回传标题/豆瓣链接，壳弹原生 NSMenu；无卡片上下文
+    /// （空白处/普通文本）不拦截，保留 WebKit 默认行为。属性选择器与
+    /// weimo-ui 类名解耦
+    private static let contextMenuScript = """
+    (function () {
+      document.addEventListener('contextmenu', function (event) {
+        var node = event.target;
+        var element = node && node.closest ? node : (node ? node.parentElement : null);
+        var card = element ? element.closest('li[data-subject-url]') : null;
+        if (!card) return;
+        event.preventDefault();
+        window.webkit.messageHandlers.shellContextMenu.postMessage({
+          url: card.getAttribute('data-subject-url') || '',
+          title: card.getAttribute('data-title') || ''
+        });
+      }, false);
+    })();
+    """
 
     private var window: NSWindow!
     private var webView: WKWebView!
@@ -45,12 +66,21 @@ final class MainWindowController: NSObject, NSWindowDelegate, WKNavigationDelega
         let configuration = WKWebViewConfiguration()
         // 默认持久 dataStore：前端 localStorage 存 uid/主题等，必须持久
         configuration.websiteDataStore = .default()
+        let userContentController = configuration.userContentController
         let isTauri = WKUserScript(
             source: "window.isTauri = true;",
             injectionTime: .atDocumentStart,
             forMainFrameOnly: true
         )
-        configuration.userContentController.addUserScript(isTauri)
+        userContentController.addUserScript(isTauri)
+        userContentController.addUserScript(WKUserScript(
+            source: Self.contextMenuScript,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true))
+        // WKUserContentController 对 handler 强持有——弱代理切断
+        // config→controller→self→webView 的经典保留环
+        userContentController.add(
+            WeakMessageProxy(target: self), name: "shellContextMenu")
 
         webView = WKWebView(frame: window.contentView?.bounds ?? contentRect, configuration: configuration)
         webView.autoresizingMask = [.width, .height]
@@ -154,6 +184,79 @@ final class MainWindowController: NSObject, NSWindowDelegate, WKNavigationDelega
             ShellSupport.openExternal(url)
         }
         return nil
+    }
+
+    // MARK: 原生右键菜单（WKScriptMessageHandler 桥，路线图 2.2）
+
+    /// WKUserContentController 强持有 handler 的弱代理壳
+    private final class WeakMessageProxy: NSObject, WKScriptMessageHandler {
+        weak var target: WKScriptMessageHandler?
+        init(target: WKScriptMessageHandler) {
+            self.target = target
+            super.init()
+        }
+        func userContentController(
+            _ userContentController: WKUserContentController,
+            didReceive message: WKScriptMessage
+        ) {
+            target?.userContentController(userContentController, didReceive: message)
+        }
+    }
+
+    /// 消息在主线程送达，可直接弹菜单；鼠标位置取当前 NSEvent（消息异步
+    /// 到达的毫秒级漂移可忽略）
+    func userContentController(
+        _ userContentController: WKUserContentController,
+        didReceive message: WKScriptMessage
+    ) {
+        guard message.name == "shellContextMenu",
+              let body = message.body as? [String: Any],
+              let url = body["url"] as? String, !url.isEmpty
+        else { return }
+        presentCardContextMenu(title: (body["title"] as? String) ?? "", url: url)
+    }
+
+    private func presentCardContextMenu(title: String, url: String) {
+        let menu = NSMenu()
+        if !title.isEmpty {
+            let copyTitle = NSMenuItem(title: "复制标题", action: #selector(copyTitleTapped(_:)), keyEquivalent: "")
+            copyTitle.target = self
+            copyTitle.representedObject = title
+            menu.addItem(copyTitle)
+        }
+        let copyLink = NSMenuItem(title: "复制豆瓣链接", action: #selector(copyLinkTapped(_:)), keyEquivalent: "")
+        copyLink.target = self
+        copyLink.representedObject = url
+        menu.addItem(copyLink)
+        if let itemURL = URL(string: url) {
+            let open = NSMenuItem(title: "在豆瓣打开", action: #selector(openLinkTapped(_:)), keyEquivalent: "")
+            open.target = self
+            open.representedObject = itemURL
+            menu.addItem(.separator())
+            menu.addItem(open)
+        }
+        let location = webView.convert(NSEvent.mouseLocation, from: nil)
+        menu.popUp(positioning: nil, at: location, in: webView)
+    }
+
+    @objc private func copyTitleTapped(_ sender: NSMenuItem) {
+        copyToPasteboard((sender.representedObject as? String) ?? "")
+    }
+
+    @objc private func copyLinkTapped(_ sender: NSMenuItem) {
+        copyToPasteboard((sender.representedObject as? String) ?? "")
+    }
+
+    @objc private func openLinkTapped(_ sender: NSMenuItem) {
+        if let url = sender.representedObject as? URL {
+            ShellSupport.openExternal(url)
+        }
+    }
+
+    private func copyToPasteboard(_ string: String) {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(string, forType: .string)
     }
 
     // MARK: 下载（WKDownloadDelegate）——CSV 导出落 NSSavePanel
