@@ -180,13 +180,18 @@ export function LoginDialog({ onOpenChange, open }: LoginDialogProps) {
               }
             >
               <label className="login-dialog__field">
+                {/* macOS WebKit 默认开自动拼写订正/自动大写，豆瓣 ID 是纯
+                    字母数字串，被订正成英文单词反而干扰输入，关掉三件套 */}
                 <input
+                  autoCapitalize="none"
+                  autoCorrect="off"
                   className="login-dialog__input"
                   name="douban-uid"
                   onChange={(event) => handleDraftChange(event.target.value)}
                   onKeyDown={handleInputKeyDown}
                   placeholder="从「我的豆瓣」查找豆瓣 ID"
                   readOnly={manageMode}
+                  spellCheck={false}
                   type="text"
                   value={draft}
                 />

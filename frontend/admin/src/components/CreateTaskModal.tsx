@@ -4,6 +4,7 @@ import { PlusOutlined } from '@ant-design/icons';
 import { ModalForm, ProFormSelect, ProFormSwitch } from '@ant-design/pro-components';
 import { api, parseUserInput } from '../api';
 import { CATEGORY_OPTIONS, STATUS_OPTIONS } from '../labels';
+import { useNoSpellCheck } from '../no-spellcheck';
 
 /** 新建同步任务：豆瓣用户在表单内选择（已知用户自动补全，也可输入新 uid 完成冷启动） */
 export default function CreateTaskModal({
@@ -19,6 +20,8 @@ export default function CreateTaskModal({
 }) {
   const { message } = AntApp.useApp();
   const [userOptions, setUserOptions] = useState<{ value: string; label: string }[]>([]);
+  // 用户输入框收 ID/链接，macOS 上关掉自动拼写订正
+  const userRef = useNoSpellCheck();
 
   // 已知用户做自动补全（旧版后端无 /users 端点时回退空选项，自由输入不受影响）
   useEffect(() => {
@@ -86,6 +89,7 @@ export default function CreateTaskModal({
           extra="输入框支持已知用户昵称/ID 检索，也可直接粘贴新用户主页链接为其创建首个同步"
         >
           <AutoComplete
+            ref={userRef}
             options={userOptions}
             filterOption={(input, option) =>
               (option?.value ?? '').toLowerCase().includes(input.toLowerCase()) ||

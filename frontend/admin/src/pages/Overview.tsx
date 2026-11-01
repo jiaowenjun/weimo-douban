@@ -8,6 +8,7 @@ import type { ServerInfo, Subscription, TaskSummary } from '../types';
 import { api, health, parseUserInput } from '../api';
 import { TaskStatusTag } from '../labels';
 import { UserCell } from '../user-profile';
+import { useNoSpellCheck } from '../no-spellcheck';
 
 const fmtInterval = (secs: number) =>
   secs % 86400 === 0 ? `${secs / 86400} 天` : secs % 3600 === 0 ? `${secs / 3600} 小时` : `${Math.round(secs / 60)} 分钟`;
@@ -28,6 +29,8 @@ export default function Overview() {
   const [adding, setAdding] = useState(false);
   const [userOptions, setUserOptions] = useState<{ value: string; label: string }[]>([]);
   const [messageApi, contextHolder] = message.useMessage();
+  // 订阅用户输入框收 ID/链接，macOS 上关掉自动拼写订正
+  const subUidRef = useNoSpellCheck();
 
   const load = async () => {
     try {
@@ -238,6 +241,7 @@ export default function Overview() {
       >
         <Space wrap style={{ marginBottom: 12 }}>
           <AutoComplete
+            ref={subUidRef}
             value={subUid}
             onChange={setSubUid}
             options={userOptions}
