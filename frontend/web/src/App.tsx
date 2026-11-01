@@ -20,7 +20,6 @@ import {
 } from './site/navigation'
 import { TopBarExport } from './site/marks-export'
 import { MarksPage } from './site/pages/marks-page'
-import { SpinDemoPage } from './site/pages/spin-demo-page'
 import { WelcomePage } from './site/pages/welcome-page'
 import { TopBarSearch } from './site/search-dialog'
 import { SiteSettingsProvider } from './site/site-settings-provider'
@@ -136,11 +135,6 @@ function SiteShell() {
   // hero 标题区），不套 SiteTemplate 应用壳。分支置于全部 hooks 之后——
   // 提前 return 会令 / 与应用页两分支 hook 数不一致，违反 Rules of Hooks
   if (pathname === '/') return <WelcomePage />
-
-  // 旋转演示页（#/spin-demo URL 直达，不入导航）：展示与诊断「分类中」
-  // 图标旋转的专用页——独立壳同欢迎页（无侧边栏干扰），静态段优先于
-  // 动态 /:category 的匹配在此提前 return，不进 SiteTemplate 路由
-  if (pathname === '/spin-demo') return <SpinDemoPage />
 
   return (
     <SiteTemplate

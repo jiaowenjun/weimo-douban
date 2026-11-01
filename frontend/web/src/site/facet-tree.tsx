@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import type { ReactNode } from 'react'
-import { BookOpen, Clapperboard, Film, Music, RefreshCw, Tv } from 'lucide-react'
+import { BookOpen, Clapperboard, Film, Music, Tv } from 'lucide-react'
 
 import { TagTree } from 'weimo-ui-tagtree/components/tag-tree'
 import type { TagTreeNode } from 'weimo-ui-tagtree/components/tag-tree'
@@ -23,7 +23,6 @@ import {
   type NavTarget,
 } from './navigation'
 import type { MarksCategory } from './navigation'
-import './facet-tree.css'
 
 /** 一级类别根行图标（根兼任类别导航，观感对齐原导航树行）；movie 项
  *  兼作影视形态一级节点的兜底图标（无专属图标的形态值用） */
@@ -33,13 +32,12 @@ const CATEGORY_ICONS: Record<MarksCategory, ReactNode> = {
   music: <Music aria-hidden="true" />,
 }
 
-/** 影视形态一级节点图标：电影/电视剧专属；「分类中」用持续转动的
- *  刷新图标示意富集进行中（桶随富集完成消失，动画天然临时），其余
- *  形态值回退 Clapperboard */
+/** 影视形态一级节点图标：电影/电视剧专属，其余形态值（「分类中」
+ *  未细分桶等）回退 Clapperboard——与其他类别根同观感，不作进行中
+ *  示意（富集暂态避免视觉干扰） */
 const KIND_ICONS: Record<string, ReactNode> = {
   电影: <Film aria-hidden="true" />,
   电视剧: <Tv aria-hidden="true" />,
-  分类中: <RefreshCw aria-hidden="true" className="facet-tree__icon-spin" />,
 }
 
 type TagAction = {
@@ -136,8 +134,8 @@ function buildMovieNodes(
     byTag.set(kindTag, { category: 'movie', path: [{ dim: kindKey, value }] })
     return {
       tag: kindTag,
-      // label 走展示名映射：pending 形态显示「影视（分类中）」（URL/tag
-      // 语义值不变）；电影/电视剧原样
+      // label 走展示名映射：pending 形态归「影视」（URL/tag 语义值
+      // 不变）；电影/电视剧原样
       label: facetValueLabel('movie', kindKey, value),
       itemCount: count,
       icon: KIND_ICONS[value] ?? CATEGORY_ICONS.movie,
