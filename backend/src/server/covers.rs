@@ -381,15 +381,28 @@ async fn read_nonempty(path: &Path) -> Option<Vec<u8>> {
     (!bytes.is_empty()).then_some(bytes)
 }
 
-/// 豆瓣「无封面」兜底图判定：收藏页对无封面条目返回 asset.doubanio.com
-/// 上的静态占位图（现知 4 种：book-default-lpic.gif / movie_default_small.png /
-/// tv_default_small.png / music-default-lpic.*.gif），真实封面与头像都在
-/// img*.doubanio.com。按 host 精确匹配——封面位出现该域即兜底图，天然覆盖
-/// 未来新增变体；不放宽到任意 doubanio 域，避免误吞未来真实封面域。
+/// 豆瓣「无封面」兜底图判定（两类形态，均按无封面归一）：
+/// ①收藏页对无封面条目返回 asset.doubanio.com 静态占位图（/cuphead/ 下，
+///   现知 book-default-lpic.gif / movie_default_small.png / tv_default_small.png /
+///   music-default-lpic.*.gif），按 host 整域匹配覆盖未来变体；
+/// ②rexxar 富集接口（m.douban.com frodo）对无封面条目返回
+///   img*.doubanio.com/f/frodo/<hash>/pics/subject/{book|movie|music}_large.jpg
+///   接口占位图（线上实测三类齐）——/f/frodo/ 是 frodo 静态资源分发前缀，
+///   真实封面永在 /view/photo/ 与 /view/subject/ 下，路径前缀即语义边界。
+///   前端 mark-card 取 subject.cover 优先于记录 cover，此形态漏判会以
+///   富集占位盖过已归一的空值再现失败态刷新按钮。
+/// 两类都不放宽到「任意 doubanio 域任意路径」，避免误吞未来真实封面。
 fn is_douban_default_cover(url: &str) -> bool {
     url::Url::parse(url)
         .ok()
-        .and_then(|u| u.host_str().map(|h| h == "asset.doubanio.com"))
+        .and_then(|u| {
+            let host = u.host_str()?;
+            Some(
+                host == "asset.doubanio.com"
+                    || (host.ends_with(".doubanio.com")
+                        && u.path().starts_with("/f/frodo/")),
+            )
+        })
         .unwrap_or(false)
 }
 
@@ -483,20 +496,27 @@ mod tests {
 
     #[test]
     fn proxy_url_empty_for_douban_default_covers() {
-        // 豆瓣无封面兜底图（asset.doubanio.com 静态资源域，线上实测 4 种形态）
-        // 归一为空串，前端按无封面渲染 CSS 占位区
+        // 豆瓣无封面兜底图两类形态（线上实测）归一为空串，前端按无封面
+        // 渲染 CSS 占位区：①收藏页 asset.doubanio.com 静态占位；②rexxar 富集
+        // 接口 /f/frodo/<hash>/pics/subject/*_large.jpg 接口占位
         for u in [
             "https://asset.doubanio.com/cuphead/book-static/pics/book-default-lpic.gif",
             "https://asset.doubanio.com/cuphead/movie-static/pics/movie_default_small.png",
             "https://asset.doubanio.com/cuphead/movie-static/pics/tv_default_small.png",
             "https://asset.doubanio.com/cuphead/vendors/pics/music-default-lpic.eac158170058.gif",
+            "https://img2.doubanio.com/f/frodo/ddc30012b6268cb7371e5e339418018e5fef5e06/pics/subject/book_large.jpg",
+            "https://img2.doubanio.com/f/frodo/753fa1e93c945e533e52dddab73b2b55a1083083/pics/subject/movie_large.jpg",
+            "https://img2.doubanio.com/f/frodo/0d633bcc86244928e29a13cc27cf4a8bcecfadb3/pics/subject/music_large.jpg",
         ] {
             assert_eq!(cover_proxy_url(u), "", "兜底图应归一为空: {u}");
         }
-        // 真实封面与头像（img*.doubanio.com）不受影响
+        // 真实封面与头像（img*.doubanio.com /view/ 与 /icon/）不受影响
         assert!(cover_proxy_url("https://img2.doubanio.com/view/subject/s/public/s27018761.jpg")
             .starts_with("/api/v1/covers?u="));
         assert!(cover_proxy_url("https://img9.doubanio.com/icon/u145680993-334.webp")
+            .starts_with("/api/v1/covers?u="));
+        // /f/frodo/ 判定限定 doubanio 域：非豆瓣域同路径不归一（交给白名单拒绝）
+        assert!(cover_proxy_url("https://evil.com/f/frodo/x/pics/subject/book_large.jpg")
             .starts_with("/api/v1/covers?u="));
     }
 
