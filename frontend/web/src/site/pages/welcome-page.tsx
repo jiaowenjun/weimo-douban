@@ -193,7 +193,7 @@ export function WelcomePage() {
       pageTitle="首页"
       siteName="微墨·豆瓣"
       showThemeToggle={false}
-      subheadline="免登录，自托管，亮暗主题自适应"
+      subheadline="免登录，自托管，桌面端支持 MCP"
       topBarActions={
         // GitHub 入口仅网页端：桌面端用户从安装包获得 App、更新走内建
         // 更新器，仓库链接无意义（topBarActions 本是可选插槽，缺省即空）
