@@ -3,7 +3,7 @@
 
 use anyhow::{Context, Result};
 use rand::Rng;
-use serde_json::{Map, Value, json};
+use serde_json::{json, Map, Value};
 use sqlx::{Row, SqlitePool};
 
 use crate::crawler::Category;
@@ -118,11 +118,10 @@ pub fn map_rexxar(category: Category, v: &Value) -> SubjectRow {
             meta.insert("subtitle".into(), json!(s(v, "subtitle")));
             meta.insert(
                 "series".into(),
-                json!(
-                    v.pointer("/book_series/title")
-                        .and_then(Value::as_str)
-                        .unwrap_or_default()
-                ),
+                json!(v
+                    .pointer("/book_series/title")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()),
             );
             meta.insert("intro".into(), json!(s(v, "intro")));
         }
@@ -280,14 +279,21 @@ pub async fn process_next_job<F: DoubanFetcher>(state: &AppState, fetcher: &F) -
 
     let now = ServerConfig::now_ms();
     // 标记 running：崩溃后残留的 running 行也会被 pick_due_job 重新拾起
-    sqlx::query(
-        "UPDATE subject_jobs SET state='running', updated_ms=? WHERE category=? AND subject_id=?",
+    let claimed = sqlx::query(
+        "UPDATE subject_jobs SET state='running', updated_ms=? WHERE category=? AND subject_id=?
+         AND state IN ('queued','running')
+         AND (priority=0 OR NOT EXISTS (SELECT 1 FROM subject_cache_checks c
+              WHERE c.category=subject_jobs.category AND c.subject_id=subject_jobs.subject_id AND c.hold_until_ms>?))",
     )
     .bind(now)
     .bind(&job.category)
     .bind(&job.subject_id)
+    .bind(now)
     .execute(&state.pool)
     .await?;
+    if claimed.rows_affected() == 0 {
+        return Ok(true);
+    }
 
     match fetcher.fetch_subject(&job.category, &job.subject_id).await {
         Ok(value) => {
@@ -330,9 +336,12 @@ async fn pick_due_job(pool: &SqlitePool) -> Result<Option<SubjectJob>> {
         "SELECT category, subject_id, attempts, priority FROM subject_jobs
          WHERE state IN ('queued','running')
            AND (next_run_ms IS NULL OR next_run_ms <= ?)
+           AND (priority=0 OR NOT EXISTS (SELECT 1 FROM subject_cache_checks c
+                WHERE c.category=subject_jobs.category AND c.subject_id=subject_jobs.subject_id AND c.hold_until_ms>?))
          ORDER BY priority ASC, updated_ms ASC, rowid ASC
          LIMIT 1",
     )
+    .bind(ServerConfig::now_ms())
     .bind(ServerConfig::now_ms())
     .fetch_optional(pool)
     .await

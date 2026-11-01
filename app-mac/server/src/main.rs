@@ -51,6 +51,7 @@ async fn main() -> Result<()> {
     // 回环单用户 + 前后端同源：不启用鉴权与 CORS
     config.token = String::new();
     config.cors_origins = String::new();
+    config.configure_desktop();
 
     let router = weimo_douban::server::build_server(config).await?;
     let router = router.nest_service(WEB_MOUNT, static_files::router());

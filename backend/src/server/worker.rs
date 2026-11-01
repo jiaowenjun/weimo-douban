@@ -53,6 +53,21 @@ pub async fn run_worker<F: DoubanFetcher>(state: AppState, fetcher: F) {
                         continue;
                     }
                 }
+                // A crashed/disabled center client cannot send a wakeup when its
+                // short lease expires. Revisit at that deadline instead of making
+                // normal jobs wait for the 60s idle scan after an App restart.
+                let now = ServerConfig::now_ms();
+                let lease_until: Option<i64> = sqlx::query_scalar(
+                    "SELECT MIN(hold_until_ms) FROM subject_cache_checks WHERE hold_until_ms>?",
+                )
+                .bind(now)
+                .fetch_one(&state.pool)
+                .await
+                .unwrap_or(None);
+                let idle_scan = lease_until
+                    .map(|until| Duration::from_millis((until - now).max(1) as u64))
+                    .unwrap_or(IDLE_SCAN)
+                    .min(IDLE_SCAN);
                 tokio::select! {
                     changed = wakeup.changed() => {
                         if changed.is_err() {
@@ -60,7 +75,7 @@ pub async fn run_worker<F: DoubanFetcher>(state: AppState, fetcher: F) {
                             tokio::time::sleep(IDLE_SCAN).await;
                         }
                     }
-                    _ = tokio::time::sleep(IDLE_SCAN) => {}
+                    _ = tokio::time::sleep(idle_scan) => {}
                 }
             }
             Err(e) => {

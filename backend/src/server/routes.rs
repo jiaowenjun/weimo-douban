@@ -56,7 +56,7 @@ pub fn build_app(state: AppState) -> Router {
         ))
         .with_state(state.clone());
 
-    let api = Router::new()
+    let mut api = Router::new()
         .route("/syncs", get(list_syncs).post(create_sync))
         .route("/syncs/{task_id}", get(get_sync).delete(delete_sync))
         .route("/syncs/{task_id}/result", get(get_result))
@@ -90,7 +90,16 @@ pub fn build_app(state: AppState) -> Router {
                 .put(put_subscription)
                 .delete(delete_subscription),
         )
-        .route("/server/info", get(server_info))
+        .route("/server/info", get(server_info));
+    if state.config.desktop_app {
+        api = api.route(
+            "/app/subject-cache",
+            get(super::subject_cache_client::get_preferences)
+                .patch(super::subject_cache_client::set_preferences),
+        );
+    }
+    let cache_api = super::subject_cache::router(&state);
+    let api = api
         .layer(middleware::from_fn_with_state(
             state.clone(),
             super::cache::middleware,
@@ -104,7 +113,9 @@ pub fn build_app(state: AppState) -> Router {
             rate_limit_middleware,
         ))
         .with_state(state)
-        .merge(covers);
+        .merge(covers)
+        // 公共只读入口独立于网页鉴权、响应缓存与共享 IP 限流。
+        .merge(cache_api);
 
     let router = Router::new()
         .route("/healthz", get(healthz))

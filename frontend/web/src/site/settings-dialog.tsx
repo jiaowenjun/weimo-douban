@@ -8,6 +8,7 @@ import {
 import { LabeledSwitch } from 'weimo-ui-core/components/labeled-switch'
 
 import { useSiteSettings } from './site-settings'
+import { SubjectCacheSetting } from './subject-cache-setting'
 import './settings-dialog.css'
 
 type SettingsDialogProps = {
@@ -61,6 +62,7 @@ export function SettingsDialog({ onOpenChange, open }: SettingsDialogProps) {
               />
             </div>
           </div>
+          <SubjectCacheSetting open={open} />
         </DialogPanel>
       </DialogPopup>
     </Dialog>

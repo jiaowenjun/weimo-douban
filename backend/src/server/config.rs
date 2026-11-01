@@ -93,9 +93,28 @@ pub struct ServerConfig {
         default_value_t = 300
     )]
     pub subject_category_cooldown_secs: i64,
+
+    /// 提供公共条目缓存（独立只读连接、独立限流；默认不开放）
+    #[arg(long, env = "SYNC_SUBJECT_CACHE_SERVE", default_value_t = false)]
+    pub subject_cache_serve: bool,
+
+    /// 可选中心缓存的完整 batch URL；空字符串关闭，服务器默认不使用
+    #[arg(long, env = "SYNC_SUBJECT_CACHE_URL")]
+    pub subject_cache_url: Option<String>,
+
+    /// 仅桌面入口设置，允许本机持久化缓存偏好；不接受远程 CLI 开启
+    #[arg(skip)]
+    pub desktop_app: bool,
 }
 
 impl ServerConfig {
+    pub fn configure_desktop(&mut self) {
+        self.desktop_app = true;
+        self.subject_cache_serve = false;
+        self.subject_cache_url
+            .get_or_insert_with(|| "https://weimo.ink/douban/api/v1/subjects/batch".to_owned());
+    }
+
     pub fn db_path(&self) -> PathBuf {
         self.data_dir.join("douban_export.db")
     }

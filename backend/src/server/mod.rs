@@ -9,9 +9,11 @@ pub mod error;
 pub mod fetcher;
 pub mod routes;
 pub mod service;
-pub mod subject;
 pub mod state;
 pub mod stats;
+pub mod subject;
+pub mod subject_cache;
+pub mod subject_cache_client;
 pub mod worker;
 
 use anyhow::{Context, Result};
@@ -50,6 +52,13 @@ pub async fn build_server(config: config::ServerConfig) -> Result<axum::Router> 
         .await
         .context("数据库初始化失败")?;
     let state = state::AppState::new(config.clone(), pool);
+
+    if let Err(error) = subject_cache_client::load_preferences(&state).await {
+        tracing::warn!(%error, "读取中心缓存偏好失败，本次启动使用本地抓取");
+    }
+    if state.subject_cache_client.is_some() {
+        tokio::spawn(subject_cache_client::run(state.clone()));
+    }
 
     tokio::spawn(worker::run_worker(
         state.clone(),

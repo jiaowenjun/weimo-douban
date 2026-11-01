@@ -1,7 +1,10 @@
 //! SQLite 连接与建表（weimo-ocr 风格：内嵌 bootstrap SQL，不用 sqlx migrate）。
 
 use anyhow::{Context, Result};
-use sqlx::{sqlite::SqlitePoolOptions, SqlitePool};
+use sqlx::{
+    sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions},
+    SqlitePool,
+};
 
 const BOOTSTRAP_SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS tasks (
@@ -133,13 +136,31 @@ CREATE INDEX IF NOT EXISTS idx_records_dim_date ON records(uid, category, dim_st
 CREATE INDEX IF NOT EXISTS idx_records_subject ON records(category, subject_id);
 CREATE INDEX IF NOT EXISTS idx_subjects_retry ON subjects(status, next_retry_ms);
 CREATE INDEX IF NOT EXISTS idx_subject_jobs_due ON subject_jobs(state, next_run_ms);
+
+CREATE TABLE IF NOT EXISTS app_preferences (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+-- 中心查询的短租约只约束普通抓取，不占用豆瓣重试次数或退避时间。
+CREATE TABLE IF NOT EXISTS subject_cache_checks (
+  category TEXT NOT NULL,
+  subject_id TEXT NOT NULL,
+  next_check_ms INTEGER NOT NULL DEFAULT 0,
+  hold_until_ms INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (category, subject_id)
+);
 "#;
 
 pub async fn connect(db_path: &std::path::Path) -> Result<SqlitePool> {
-    let url = format!("sqlite:{}?mode=rwc", db_path.display());
+    // WAL 使只读缓存查询不阻塞网页同步的提交；模式随数据库持久化。
+    let options = SqliteConnectOptions::new()
+        .filename(db_path)
+        .create_if_missing(true)
+        .journal_mode(SqliteJournalMode::Wal)
+        .foreign_keys(true);
     let pool = SqlitePoolOptions::new()
         .max_connections(5)
-        .connect(&url)
+        .connect_with(options)
         .await
         .with_context(|| format!("连接数据库失败: {}", db_path.display()))?;
 

@@ -26,8 +26,8 @@ WeimoDoubanNative.app（单进程 + sidecar）
 ## 关键设计
 
 - **数据目录共用**：`~/Library/Application Support/ink.weimo.douban/`
-  （Tauri 版同库同 covers，免重抓）。SQLite 未开 WAL、busy_timeout 仅
-  sqlx 默认 5s——**两版同时运行有写冲突风险**，启动时检测 Tauri 版在
+  （Tauri 版同库同 covers，免重抓）。SQLite 使用 WAL，但两版各有抓取
+  worker，**两版同时运行仍有写冲突风险**，启动时检测 Tauri 版在
   跑则弹警告，由用户定夺；本壳自身按 bundle id 单实例。
 - **bundle id 独立**：`ink.weimo.douban.native`，与 Tauri 版可共存。
 - **前端零改动**：WKWebView documentStart 注入 `window.isTauri = true`，
@@ -86,6 +86,11 @@ curl http://127.0.0.1:<port>/healthz        # {"status":"ok"}（根路径，不�
 
 `SYNC_CRAWL_*`/`SYNC_SUBJECT_*` 等环境变量透传（语义同服务器部署）；
 `bind`/`token`/`cors` 由进程强制接管。
+
+App 默认使用微墨中心详情缓存，可在设置中关闭；中心离线或限流时自动从本机访问豆瓣。
+`SYNC_SUBJECT_CACHE_URL=''` 可在启动时禁用，设置中不能覆盖该禁用。
+偏好存入本地数据库，跨随机端口持久。中心仅收到条目编号和请求 IP，
+不接收用户评分、短评或豆瓣 Cookie。详见[中心缓存方案](../中心条目缓存接入方案.md)。
 
 ## v1 范围外（后续项，见路线图）
 

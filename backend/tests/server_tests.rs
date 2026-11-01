@@ -49,6 +49,9 @@ fn test_config(dir: &TempDir, token: &str) -> ServerConfig {
         subject_ttl_secs: 2_592_000,
         subject_min_interval_secs: 0.0, // 测试不限速
         subject_category_cooldown_secs: 300,
+        subject_cache_serve: false,
+        subject_cache_url: None,
+        desktop_app: false,
         // oneshot 无真实连接，IP 回退到 loopback 且全测试共享；调大避免互扰
         rate_per_minute: 10_000_000,
     }

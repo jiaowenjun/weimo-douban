@@ -16,6 +16,8 @@ pub struct AppState {
     pub pool: SqlitePool,
     pub covers: CoverService,
     pub projections: Arc<tokio::sync::Mutex<super::cache::ProjectionCache>>,
+    pub subject_cache: Option<Arc<super::subject_cache::CacheServer>>,
+    pub subject_cache_client: Option<Arc<super::subject_cache_client::CacheClient>>,
     worker_wakeup_tx: watch::Sender<u64>,
     /// 维度进度变更通知（载荷为 task_id），SSE 订阅端按 task_id 过滤
     progress_tx: broadcast::Sender<String>,
@@ -38,6 +40,11 @@ impl AppState {
         let (progress_tx, _) = broadcast::channel(256);
         static RATE_TABLE: OnceLock<Mutex<HashMap<IpAddr, (u64, u32)>>> = OnceLock::new();
         Self {
+            subject_cache: config
+                .subject_cache_serve
+                .then(|| Arc::new(super::subject_cache::CacheServer::new(&config.db_path()))),
+            subject_cache_client: super::subject_cache_client::CacheClient::from_config(&config)
+                .map(Arc::new),
             config: config.clone(),
             pool,
             projections: Arc::new(tokio::sync::Mutex::new(Default::default())),

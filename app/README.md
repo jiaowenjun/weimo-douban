@@ -103,6 +103,7 @@ CI 产物资产名全 ASCII（`weimo-douban` 前缀，与 mac 同约定——gh 
 | 变量 | 默认 | 说明 |
 |---|---|---|
 | `SYNC_UPDATER_URL` | Gitee 优先+GitHub 回退 | 更新 manifest 端点覆盖（设为单端点；release 构建仅接受 https；本地联调需临时开 `dangerousInsecureTransportProtocol` 重新构建） |
+| `SYNC_SUBJECT_CACHE_URL` | 微墨中心 batch 接口 | 可选详情加速；空字符串禁用，故障自动回退本地豆瓣抓取。设置中的开关持久化在本地 SQLite |
 | `SYNC_UPDATE_AUTO` | 空 | `1` = 发现新版本不经确认直接装（无人值守） |
 | `SYNC_CRAWL_*` / `SYNC_SUBJECT_*` / `SYNC_DOUBAN_COOKIE` 等 | 后端默认 | 抓取/富集调参，语义与服务器部署一致（见根 README 参数表） |
 
