@@ -109,7 +109,7 @@ async function fetchAllMarks(uid: string): Promise<DoubanMark[]> {
   return items
 }
 
-/** 顶栏导出入口：搜索按钮旁的下载按钮，点击后全量拉取登录用户的标记
+/** 顶栏导出入口：顶栏右侧的下载按钮，点击后全量拉取登录用户的标记
  *  （all 合并视图）生成 CSV 下载（UTF-8 BOM 前置，Excel 直接打开中文
  *  不乱码）；未登录点击转登录对话框，拉取失败以对话框提示 */
 export function TopBarExport() {
