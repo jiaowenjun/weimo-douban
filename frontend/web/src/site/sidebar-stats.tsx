@@ -21,9 +21,12 @@ export function SidebarStats() {
   const { uid } = useDoubanUser()
   const statsQuery = useDoubanStatsQuery(uid)
 
+  // value 保持数字类型：StatGroup 对数字经 MagicNumber 渲染（数值变动
+  // 滚动到新值），String() 转字符串会退回静态透出丢动画（默认 format
+  // 取整无千分位，与纯数字展示一致）
   const statItems: StatGroupItem[] = MARKS_CATEGORIES.map((category) => ({
     key: category,
-    value: String(statsQuery.data?.totals[category] ?? 0),
+    value: statsQuery.data?.totals[category] ?? 0,
     label: CATEGORY_NOUNS[category],
   }))
 
