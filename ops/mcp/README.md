@@ -52,7 +52,7 @@ location = /douban/mcp/ {
 }
 ```
 
-执行 `nginx -t` 成功后才 `systemctl reload nginx`。不开放 8021 的公网防火墙端口；`/healthz` 只用于本机检查。保留 Host、Authorization、MCP 协议头；禁用缓存、响应缓冲；访问日志不记录请求参数和凭证。仅查询功能不要求持久会话或反向请求。
+执行 `nginx -t` 成功后才 `systemctl reload nginx`。不开放 8021 的公网防火墙端口；`/healthz` 只用于本机检查。保留 Host、Authorization、MCP 协议头；禁用缓存、请求和响应缓冲，使应用的 5 秒请求体总时限也覆盖慢速上传；访问日志不记录请求参数和凭证。仅查询功能不要求持久会话或反向请求。
 
 ## 限额与验证
 
