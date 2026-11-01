@@ -129,22 +129,26 @@ export function MarksPage() {
       ? marksQuery.error instanceof MarksQueryError
         ? marksQuery.error.kind === 'not-cached'
           ? { phase: 'not-cached' }
-          : // 409 版本已变是瞬态（富集写库持续触发）：失效版本查询后按新
-            // 版本 key 自动重拉，这里保持 loading 而非报错；withCachedFallback
+          : // 409 版本已变与 429 限流同为瞬态（富集写库持续触发前者、
+            // 同步高峰请求密集触发后者）：失效版本查询/固定窗口翻页后
+            // 自动重试，这里保持 loading 而非报错；withCachedFallback
             // 有旧版本数据时 data 已被填充、不会走到该分支
-            marksQuery.error.kind === 'version-stale'
+            marksQuery.error.kind === 'version-stale' ||
+              marksQuery.error.kind === 'rate-limited'
           ? { phase: 'loading' }
           : { phase: 'error', message: marksQuery.error.message }
         : { phase: 'error', message: marksQuery.error.message }
         : dimsQuery.isError && matchedIds === null
         ? // 筛选态下 dims 未就绪的门控错误：404 未同步归入 not-cached
           // （首登自动同步对其生效——带筛选落地 /movie 的用户先撞到的
-          // 就是这条路）；409 同为瞬态保持 loading，其余才算加载失败
+          // 就是这条路）；409 与 429 同为瞬态保持 loading，其余才算
+          // 加载失败
           dimsQuery.error instanceof DoubanDataQueryError &&
             dimsQuery.error.kind === 'not-cached'
           ? { phase: 'not-cached' }
           : dimsQuery.error instanceof DoubanDataQueryError &&
-              dimsQuery.error.kind === 'version-stale'
+              (dimsQuery.error.kind === 'version-stale' ||
+                dimsQuery.error.kind === 'rate-limited')
             ? { phase: 'loading' }
             : { phase: 'error', message: dimsQuery.error.message }
         : { phase: 'loading' }

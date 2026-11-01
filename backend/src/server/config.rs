@@ -53,8 +53,11 @@ pub struct ServerConfig {
     #[arg(long, env = "SYNC_QUEUE_LIMIT", default_value_t = 100)]
     pub queue_limit: i64,
 
-    /// 每分钟每 IP 请求上限
-    #[arg(long, env = "SYNC_RATE_PER_MINUTE", default_value_t = 60)]
+    /// 每分钟每 IP 请求上限。默认须覆盖首发同步高峰：3s 版本轮询 +
+    /// 每页落库/每条富集 bump 触发 dims/marks/stats 全家重拉，实测峰
+    /// 值 ~140/min（封面端点豁免不计），60 会把合法用户同步期间打出
+    /// 429——前端已把 429 归瞬态，这里再留 2 倍余量
+    #[arg(long, env = "SYNC_RATE_PER_MINUTE", default_value_t = 300)]
     pub rate_per_minute: u32,
 
     /// 订阅默认 RSS 增量轮询间隔（秒），创建订阅时未指定则用此值

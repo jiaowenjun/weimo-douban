@@ -80,7 +80,7 @@ async function requireData<T>(promise: Promise<T | null>): Promise<T> {
 }
 
 export class MarksQueryError extends Error {
-  kind: 'not-cached' | 'version-stale' | 'error'
+  kind: 'not-cached' | 'version-stale' | 'rate-limited' | 'error'
   constructor(result: Extract<MarksResult, { ok: false }>) {
     super(result.message)
     this.kind = result.kind

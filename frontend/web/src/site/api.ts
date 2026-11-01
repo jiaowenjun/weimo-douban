@@ -47,10 +47,12 @@ export type DoubanProfile = {
 /** 版本化数据查询失败：kind 区分「未同步」（端点 404，数据从未抓取——
  *  可触发首发同步）、「版本已变」（409，数据在取版本与取数据之间被
  *  重新发布——瞬态，版本查询失效后按新版本 key 自动重拉，不应作为
- *  失败展示）与一般失败（网络/限流/服务端错误） */
+ *  失败展示）、「限流」（429，服务端固定分钟窗口——同步高峰请求密
+ *  集时的瞬态，窗口翻页自动恢复，同 409 不作失败展示）与一般失败
+ *  （网络/服务端错误） */
 export class DoubanDataQueryError extends Error {
-  kind: 'not-cached' | 'version-stale' | 'error'
-  constructor(kind: 'not-cached' | 'version-stale' | 'error', message: string) {
+  kind: 'not-cached' | 'version-stale' | 'rate-limited' | 'error'
+  constructor(kind: 'not-cached' | 'version-stale' | 'rate-limited' | 'error', message: string) {
     super(message)
     this.kind = kind
   }
@@ -68,6 +70,11 @@ async function fetchVersionedJson<T>(uid: string, endpoint: string, params: URLS
       if (response.status === 409) {
         void queryClient.invalidateQueries({ queryKey: ['douban', uid, 'versions'] })
         throw new DoubanDataQueryError('version-stale', '数据已更新，正在重新加载')
+      }
+      // 429 = 服务端固定分钟窗口限流（首发同步高峰请求密集时可达）：
+      // 窗口翻页自动恢复，按瞬态处理不作失败展示
+      if (response.status === 429) {
+        throw new DoubanDataQueryError('rate-limited', '请求过于频繁，稍候自动重试')
       }
       // 404 = 该维度从未同步过（合法空态，调用方区分处理）
       if (response.status === 404) return null
@@ -174,7 +181,7 @@ export type DoubanMarksPage = {
 
 export type MarksResult =
   | { ok: true; data: DoubanMarksPage }
-  | { ok: false; kind: 'not-cached' | 'version-stale' | 'error'; message: string }
+  | { ok: false; kind: 'not-cached' | 'version-stale' | 'rate-limited' | 'error'; message: string }
 
 /** 拉取某维度（category+status）的标记页；只读缓存，不触发抓取。
  *  category 另接受 'all'：书影音三类别按日期归并的合并视图
@@ -217,7 +224,7 @@ export async function fetchDoubanMarks(
     if (res.ok) {
       return { ok: true, data: (await res.json()) as DoubanMarksPage }
     }
-    let kind: 'not-cached' | 'version-stale' | 'error' = 'error'
+    let kind: 'not-cached' | 'version-stale' | 'rate-limited' | 'error' = 'error'
     let message = `请求失败（HTTP ${res.status}）`
     try {
       const body = await res.json()
@@ -227,6 +234,12 @@ export async function fetchDoubanMarks(
       if (body?.error?.code === 'CACHE_VERSION_CHANGED') {
         kind = 'version-stale'
         void queryClient.invalidateQueries({ queryKey: ['douban', uid, 'versions'] })
+      }
+      // 429：固定分钟窗口限流（同步高峰瞬态），窗口翻页自愈，同 409
+      // 不作失败展示
+      if (body?.error?.code === 'TOO_MANY_REQUESTS' || res.status === 429) {
+        kind = 'rate-limited'
+        message = '请求过于频繁，稍候自动重试'
       }
       if (body?.error?.message) message = body.error.message
     } catch {

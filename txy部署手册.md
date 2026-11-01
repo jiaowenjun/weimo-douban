@@ -506,6 +506,7 @@ curl -fsS "https://weimo.ink$JS" | grep -F -c "$DATE"   # ≥1
 
 - 日志：`journalctl -u weimo-douban -f`；同步任务记录在 db 的 records 表（保留 30 天，`SYNC_TASK_RETENTION_DAYS`）。
 - 抓取行为调优（douban 独有，按需经 env 覆盖）：`SYNC_RATE_PER_MINUTE`、`SYNC_CRAWL_MIN_INTERVAL_SECS`、`SYNC_SUBJECT_*` 系列（豆瓣 rexxar 限流敏感，见《豆瓣源依赖性与脆弱性分析.md》）。
+- **`SYNC_RATE_PER_MINUTE` 勿设低于 ~200**（2026-11-01 实测教训）：默认已从 60 提至 300——首发同步高峰（3s 版本轮询 + 每页直写/每条富集落库触发 dims/marks/stats 全家重拉，封面端点豁免不计）峰值 ~140/min，60/分钟的旧默认会把合法用户同步期间打出 429，表现为侧边栏「筛选数据暂不可用」闪现（前端已把 429 归瞬态自动恢复，限流余量仍应给足）；douban.env 若显式设了低值需同步上调。
 - 迁移完成后，本地 `backend/data` 不再是生产数据源；本地开发继续用本地副本，两边数据各自演化，**不要**再双向 rsync。
 
 ---
