@@ -85,12 +85,8 @@
   white-space: nowrap;
 }
 
-/* 触发钮零收缩：标签放开收缩只解决「谁 absorbs」，flex-shrink 仍按
-   基宽比例向全部 flex 项分摊压缩——圆钮 34→28 被挤成竖椭圆（实测
-   第二轮抓到）；flex: none 让它彻底退出分摊，空间不够全归标签截断 */
-#root[data-island-demo] .weimo-site-template__sidebar-trigger {
-  flex: none;
-}
+/* 触发钮零收缩已上移 index.css 全站兜底（生产 v1 落地时一并采纳），
+   演示页不再重复声明 */
 
 .island-demo-leading.island-demo-yield {
   opacity: 0;

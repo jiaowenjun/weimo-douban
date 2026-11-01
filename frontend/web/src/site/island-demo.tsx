@@ -113,12 +113,16 @@ export function IslandDemoNotice() {
     update()
     const observer = new ResizeObserver(update)
     observer.observe(noticeEl)
-    observer.observe(document.documentElement)
     // 标题宽度随「长标题」开关变，遮叠状态须随测
     const leadingEl = document.querySelector('.island-demo-leading')
     if (leadingEl) observer.observe(leadingEl)
+    // 视口变化走 window.resize：RO(documentElement) 在 Chromium 不随
+    // 视口 resize 触发（生产落地实测踩坑，此前靠长标题截断的 RO 侧路
+    // 侥幸覆盖）
+    window.addEventListener('resize', update)
     return () => {
       observer.disconnect()
+      window.removeEventListener('resize', update)
       document
         .querySelectorAll('.island-demo-yield')
         .forEach((el) => el.classList.remove('island-demo-yield'))
