@@ -21,7 +21,7 @@ import './welcome-page.css'
 const APP_VERSION = '0.5.2'
 /** 上面的发布日期（页脚展示）：= GitHub Release v{APP_VERSION} 的发布日
  *  （当天本地日期，YYYY-MM-DD），随版本 bump 同步改——部署规范要求
- *  txy 网页端页脚与最新 App Release 的版本号+发布日期一致（见仓库根
+ *  txy 网页端页脚与最新 App Release 的版本号+发布日期一致（见 ops/
  *  《txy部署手册.md》完整部署一节：一次完整部署 = 网页端上 txy + 发新版
  *  App，页脚是两端的对齐凭据）。计划日与实际发布日不符时以实际为准，
  *  改此处后重走 web 构建 */

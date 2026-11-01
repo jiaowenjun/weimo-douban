@@ -57,7 +57,7 @@ Windows 无 LSUIElement 概念（该 plist 项被忽略）：App 正常显示任
   务必备份**）；
 - 安装后重启（macOS 上整包替换 .app；Windows 上装 NSIS 更新包整包替换）。
 
-发布流程（**发版必走「完整部署」：网页端同步上 txy，见仓库根
+发布流程（**发版必走「完整部署」：网页端同步上 txy，见 ops/
 《txy部署手册.md》§7.5**——欢迎页页脚的版本号+发布日期须与最新
 Release 一致）：版本 bump 提交（四处改点：`tauri.conf.json` 与本目录
 `Cargo.toml` 的 version、web 欢迎页 `APP_VERSION` 与 `APP_RELEASE_DATE`）

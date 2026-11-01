@@ -14,7 +14,7 @@ SYNC_SERVER_TOKEN=replace-with-your-token \
 ./backend/target/release/weimo-douban-server
 ```
 
-服务器提供异步同步任务、标记查询、订阅更新和后台清理。参数与环境变量以 [ServerConfig](../backend/src/server/config.rs) 为准；接口说明见[服务器 API 设计](../服务器API设计.md)。对外部署参考[部署手册](../txy部署手册.md)。
+服务器提供异步同步任务、标记查询、订阅更新和后台清理。参数与环境变量以 [ServerConfig](../backend/src/server/config.rs) 为准；接口说明见[服务器 API 设计](design/服务器API设计.md)。对外部署参考[部署手册](../ops/txy部署手册.md)。
 
 创建同步任务示例：
 
@@ -51,9 +51,16 @@ curl -H 'Authorization: Bearer replace-with-your-token' \
 
 ## 设计资料
 
-- [服务器技术选型](../服务器技术选型.md)
-- [缓存与同步策略](../缓存与同步策略.md)
-- [条目元信息富集](../条目元信息富集方案.md)
-- [中心详情缓存](../中心条目缓存接入方案.md)
-- [豆瓣 API 调研](../豆瓣API调研报告.md)
-- [豆瓣源依赖性与限制](../豆瓣源依赖性与脆弱性分析.md)
+设计与方案（[design/](design/)）：
+
+- [服务器技术选型](design/服务器技术选型.md)
+- [服务器 API 设计](design/服务器API设计.md)
+- [缓存与同步策略](design/缓存与同步策略.md)
+- [条目元信息富集](design/条目元信息富集方案.md)
+- [中心详情缓存](design/中心条目缓存接入方案.md)
+- [mac 原生迁移路线图](design/tauri_app_mac_原生渐进式迁移路线图.md)
+
+豆瓣源调研与分析（[research/](research/)）：
+
+- [豆瓣 API 调研](research/豆瓣API调研报告.md)
+- [豆瓣源依赖性与限制](research/豆瓣源依赖性与脆弱性分析.md)

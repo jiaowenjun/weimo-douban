@@ -5,7 +5,7 @@ import { defineConfig } from 'vite'
 // https://vite.dev/config/
 export default defineConfig({
   // 生产部署在 https://weimo.ink/douban/ 子路径下（静态与 API 均带前缀），
-  // dev 保持根路径不变（详见仓库根 txy部署手册.md §4）
+  // dev 保持根路径不变（详见 ops/txy部署手册.md §4）
   base: process.env.NODE_ENV === 'production' ? '/douban/' : '/',
   plugins: [
     react(),

@@ -2,7 +2,7 @@
 
 构建脚本还会把独立的 `weimo-douban-mcp` 放入 `Contents/Resources`，供本地 Agent 用 stdio 只读查询共享数据库。运行该程序的 `--print-config` 可生成实际路径配置，详见 [MCP 接入](../mcp/README.md)。
 
-`app-mac/` 是《[tauri app mac 原生渐进式迁移路线图](../tauri_app_mac_原生渐进式迁移路线图.md)》
+`app-mac/` 是《[tauri app mac 原生渐进式迁移路线图](../docs/design/tauri_app_mac_原生渐进式迁移路线图.md)》
 的执行落地：**独立的 macOS 原生客户端**，与 `app/`（Tauri 版）并行存在、
 零改动后者（也不动 `backend/`、`frontend/`）。对应路线图终局 4B「换壳不
 换核」的第一步，v1 交付 P0 四件套 + 开机自启。
@@ -113,7 +113,7 @@ curl http://127.0.0.1:<port>/healthz        # {"status":"ok"}（根路径，不�
 App 默认使用微墨中心详情缓存，可在设置中关闭；中心离线或限流时自动从本机访问豆瓣。
 `SYNC_SUBJECT_CACHE_URL=''` 可在启动时禁用，设置中不能覆盖该禁用。
 偏好存入本地数据库，跨随机端口持久。中心仅收到条目编号和请求 IP，
-不接收用户评分、短评或豆瓣 Cookie。详见[中心缓存方案](../中心条目缓存接入方案.md)。
+不接收用户评分、短评或豆瓣 Cookie。详见[中心缓存方案](../docs/design/中心条目缓存接入方案.md)。
 
 ## v1 范围外（后续项，见路线图）
 

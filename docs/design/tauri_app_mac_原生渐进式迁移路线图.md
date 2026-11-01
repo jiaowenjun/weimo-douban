@@ -69,7 +69,7 @@
 | **控件层**（原生按钮、输入框、列表） | 页面内控件原生化 | **基本无需求**。主界面是浏览/筛选/统计型 UI，自绘设计系统（weimo-ui）是产品身份，跨 web/App 一致是特性不是债。逐控件原生化明确不做。 |
 | **架构层**（业务与 UI 分离） | 共享业务层供双端复用 | **已经就绪**。backend 独立 crate + HTTP API 就是业务边界；通用方法论里「阶段二：剥离业务逻辑」对本项目而言是已完成项，无需再做。 |
 
-另两个与通用叙事不同的点：本项目**无编辑器**（通用方法论最重的「编辑器迁移/WebView 编辑器过渡」议题无对应物）；**web 端是一等公民**（txy 部署，App 每次发版须与网页端对齐，见 `txy部署手册.md` §7.5），任何双端分叉（UI 或行为）都是持续的维护税——这是「不做 SwiftUI 重写」的独立论据。
+另两个与通用叙事不同的点：本项目**无编辑器**（通用方法论最重的「编辑器迁移/WebView 编辑器过渡」议题无对应物）；**web 端是一等公民**（txy 部署，App 每次发版须与网页端对齐，见 `ops/txy部署手册.md` §7.5），任何双端分叉（UI 或行为）都是持续的维护税——这是「不做 SwiftUI 重写」的独立论据。
 
 ---
 
@@ -199,7 +199,7 @@
 
 **Windows 兼容铁律**：`main.rs` 目前「无平台分支」是既有哲学——所有新 macOS 特性要么选跨平台插件（notification/global-shortcut/autostart/window-state 均跨平台），要么 `#[cfg]` 兜住 Windows 编译与行为；每次壳改动双平台至少编译验证（mac 本地 + app-windows CI）。
 
-**发布联动**：阶段一改动不进 web bundle → 只走 App release 流程（`app/scripts/release.sh` + `app-windows` dispatch）；阶段二/三起涉及前端 → **发版必须按 `txy部署手册.md` §7.5 与网页端联动**（App 与 weimo.ink 同一 Release 对齐）。
+**发布联动**：阶段一改动不进 web bundle → 只走 App release 流程（`app/scripts/release.sh` + `app-windows` dispatch）；阶段二/三起涉及前端 → **发版必须按 `ops/txy部署手册.md` §7.5 与网页端联动**（App 与 weimo.ink 同一 Release 对齐）。
 
 ---
 
