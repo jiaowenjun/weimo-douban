@@ -12,9 +12,9 @@ test('batched facet filtering preserves prefix/other semantics on overlapping va
       is_tv: i % 5 === 0, year: 1980 + i % 40,
     },
   }))
-  const paths: FacetStep[][] = [[], [{dim:'is_tv',value:'电影'}], [{dim:'country',value:'__other__'}],
+  const paths: FacetStep[][] = [[], [{dim:'decade',value:'1980s'}], [{dim:'country',value:'__other__'}],
     [{dim:'country',value:'__other__'}, {dim:'genre',value:'剧情'}],
-    [{dim:'is_tv',value:'电影'}, {dim:'country',value:'__other__'}, {dim:'genre',value:'__other__'}]]
+    [{dim:'country',value:'__other__'}, {dim:'genre',value:'__other__'}, {dim:'decade',value:'1980s'}]]
   for (const path of paths) {
     const expected = items.filter(item => itemMatches('movie', item, path, items)).map(item => item.id)
     assert.deepEqual(filterIds('movie', items, path), expected)

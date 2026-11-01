@@ -22,34 +22,12 @@ export const MARKS_CATEGORIES: readonly MarksCategory[] = [
 ]
 
 /** 类别中文名；movie 显示「影视」——豆瓣 movie 类目本身混合电影与
- *  电视剧（rexxar is_tv 区分），树/面包屑/标题里电影/电视剧为真一级
- *  （见 moviePageTitle），统计区合并计数用聚合名；亦作 isMarksCategory
- *  的键 */
+ *  电视剧（rexxar is_tv 区分），全链路（树/面包屑/标题/统计）统一
+ *  聚合名不细分形态；亦作 isMarksCategory 的键 */
 export const CATEGORY_NOUNS: Record<MarksCategory, string> = {
   book: '图书',
   movie: '影视',
   music: '音乐',
-}
-
-/** movie 缺形态步（is_tv）时的规范默认形态——裸 /movie 由 App 的
- *  MarksRoute 重定向补此步，标题/文案兜底同用（值硬编码中文与
- *  marks-page/facet-tree 的形态值比对同款） */
-export const DEFAULT_MOVIE_KIND = '电影'
-
-/** is_tv 派生形态值域（facet-engine 的 itemValues 同源字面量）：
- *  未富集条目归 pending（同步中/富集排队的暂态合并视图），富集完成
- *  后自动归位 movie/tv；MarksRoute 重定向兜底值与展示名映射共用 */
-export const MOVIE_KIND_VALUES = {
-  movie: '电影',
-  tv: '电视剧',
-  pending: '分类中',
-} as const
-
-/** movie 页展示标题（document.title/占位文案）：形态即一级（电影/
- *  电视剧），无「影视」聚合名；pending 归位聚合名「影视」（该批即
- *  未细分的影视混合）；kind 缺省兜底默认形态 */
-export function moviePageTitle(kind: string | undefined): string {
-  return `看过的${kind === MOVIE_KIND_VALUES.pending ? CATEGORY_NOUNS.movie : (kind ?? DEFAULT_MOVIE_KIND)}`
 }
 
 /** 页面标题动词：看过的影视 / 读过的图书 / 听过的音乐 */
@@ -67,8 +45,7 @@ export const CATEGORY_PAST_VERBS: Record<MarksCategory, string> = {
 }
 
 /** 列表 meta 行量词名词，与 CATEGORY_PAST_VERBS 配对拼「已读过 55
- *  本书」；电影/电视剧形态提升为名词（…部电影/…部电视剧，见
- *  marks-page meta 行），movie 值仅「分类中」形态兜底（富集完成后归零） */
+ *  本书」 */
 export const CATEGORY_UNIT_NOUNS: Record<MarksCategory, string> = {
   book: '本书',
   movie: '部影视',
@@ -169,11 +146,7 @@ export function resolveMarksView(
   return {
     activeItemId: category,
     category,
-    // movie 标题实际由 App 按形态覆盖（形态步经 MarksRoute 保证存在），
-    // 此处仅无 facet 一帧的兜底；book/music 为「动词过的类别名」
-    pageTitle:
-      category === 'movie'
-        ? moviePageTitle(undefined)
-        : `${CATEGORY_VERBS[category]}过的${CATEGORY_NOUNS[category]}`,
+    // 「动词过的类别名」：看过的影视 / 读过的图书 / 听过的音乐
+    pageTitle: `${CATEGORY_VERBS[category]}过的${CATEGORY_NOUNS[category]}`,
   }
 }

@@ -13,7 +13,7 @@ import {
 } from './facet-model.ts'
 import type { MarksCategory } from './navigation'
 
-/** 维度键 → dims 投影的数组字段名（派生维度 decade/is_tv 走特判） */
+/** 维度键 → dims 投影的数组字段名（派生维度 decade 走特判） */
 const DIM_FIELDS: Record<string, string> = {
   author: 'authors',
   country: 'countries',
@@ -33,24 +33,12 @@ function mergeEnabled(category: MarksCategory, dim: string): boolean {
   )
 }
 
-/** 条目在某维度的值集合（派生维度含中文语义：decade 由 year、is_tv
- *  由布尔映射电影/电视剧/分类中——未富集条目 is_tv 缺失归「分类中」，
- *  富集完成后自动归位电影/电视剧，文案示意进行中而非终态）；数组保序
- *  去重（intro 合成可能重复），无值返回空集合 */
-function itemValues(
-  category: MarksCategory,
-  dim: string,
-  item: DoubanDimsItem,
-): string[] {
+/** 条目在某维度的值集合（派生维度含中文语义：decade 由 year 每 10
+ *  年派生）；数组保序去重（intro 合成可能重复），无值返回空集合 */
+function itemValues(dim: string, item: DoubanDimsItem): string[] {
   if (dim === 'decade') {
     const y = item.dims.year
     return y && y > 1900 && y < 2100 ? [`${Math.floor(y / 10) * 10}s`] : []
-  }
-  if (dim === 'is_tv') {
-    if (category !== 'movie') return []
-    const v = item.dims.is_tv
-    if (v === undefined) return ['分类中']
-    return v ? ['电视剧'] : ['电影']
   }
   const field = DIM_FIELDS[dim]
   const list = field ? item.dims[field as keyof DoubanDimsItem['dims']] : undefined
@@ -94,13 +82,12 @@ function topKUnder(
 
 /** 某维度在某条目集上的值计数（聚合与 __other__ 匹配共用的底座） */
 function valueCounts(
-  category: MarksCategory,
   dim: string,
   items: readonly DoubanDimsItem[],
 ): Map<string, number> {
   const counts = new Map<string, number>()
   for (const item of items) {
-    for (const v of itemValues(category, dim, item)) {
+    for (const v of itemValues(dim, item)) {
       counts.set(v, (counts.get(v) ?? 0) + 1)
     }
   }
@@ -110,11 +97,10 @@ function valueCounts(
 /** 某维度在某条目集上的 singleton 值集（计数恰为 1 的值）——「其他」
  *  聚合与过滤匹配的共同依据 */
 function singletonSet(
-  category: MarksCategory,
   dim: string,
   items: readonly DoubanDimsItem[],
 ): Set<string> {
-  const counts = valueCounts(category, dim, items)
+  const counts = valueCounts(dim, items)
   const out = new Set<string>()
   for (const [value, count] of counts) {
     if (count === 1) out.add(value)
@@ -128,20 +114,19 @@ function singletonSet(
  *  树上看到的展示集一致；其余维度（singleton 折叠）=含 singleton 值。
  *  topK 由调用方按 topKUnder(该步前缀) 判定传入 */
 function matchesOtherBucket(
-  category: MarksCategory,
   dim: string,
   values: readonly string[],
   scoped: readonly DoubanDimsItem[],
   topK: number | undefined,
 ): boolean {
   if (topK !== undefined) {
-    const ranked = [...valueCounts(category, dim, scoped).entries()].sort(
+    const ranked = [...valueCounts(dim, scoped).entries()].sort(
       (a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1),
     )
     const displayed = new Set(ranked.slice(0, topK).map(([v]) => v))
     return values.some((v) => !displayed.has(v))
   }
-  const singletons = singletonSet(category, dim, scoped)
+  const singletons = singletonSet(dim, scoped)
   return values.some((v) => singletons.has(v))
 }
 
@@ -163,22 +148,20 @@ export function itemMatches(
     const stepTopK = topKUnder(category, step.dim, steps.slice(0, i))
     const hit =
       step.value !== OTHER_FACET_VALUE
-        ? itemValues(category, step.dim, item).includes(step.value)
+        ? itemValues(step.dim, item).includes(step.value)
         : matchesOtherBucket(
-            category,
             step.dim,
-            itemValues(category, step.dim, item),
+            itemValues(step.dim, item),
             scope,
             stepTopK,
           )
     if (!hit) return false
     scope = scope.filter((it) =>
       step.value !== OTHER_FACET_VALUE
-        ? itemValues(category, step.dim, it).includes(step.value)
+        ? itemValues(step.dim, it).includes(step.value)
         : matchesOtherBucket(
-            category,
             step.dim,
-            itemValues(category, step.dim, it),
+            itemValues(step.dim, it),
             scope,
             stepTopK,
           ),
@@ -197,8 +180,8 @@ export type DimCounts = { value: string; count: number }[]
  *  条目数，多值条目只计一次）；未超上限原样全展——singleton 合并
  *  不参与（封顶已保证行数上限，小桶折叠反而丢信息）。非封顶语境的
  *  开启维度 singleton 值 ≥2 个时收进 __other__ 钉末尾（仅 1 个保留
- *  原值）。filters 提供时先按命中集过滤再聚合（条件聚合，如影视形态
- *  层分支内的类型分布） */
+ *  原值）。filters 提供时先按命中集过滤再聚合（条件聚合，如分组值
+ *  叶分支内的类型分布） */
 export function aggregateDims(
   category: MarksCategory,
   items: readonly DoubanDimsItem[],
@@ -207,7 +190,7 @@ export function aggregateDims(
   const scoped = filterItems(category, items, filters)
   const out: Record<string, DimCounts> = {}
   for (const { key: dim } of DIMENSIONS[category]) {
-    const list: DimCounts = [...valueCounts(category, dim, scoped)].map(
+    const list: DimCounts = [...valueCounts(dim, scoped)].map(
       ([value, count]) => ({ value, count }),
     )
     // decade 按年代本身升序（见头注释）；其余维度计数降序、同计数值升序
@@ -221,7 +204,7 @@ export function aggregateDims(
       if (list.length > topK) {
         const displayed = new Set(list.slice(0, topK).map((x) => x.value))
         const restCount = scoped.filter((it) =>
-          itemValues(category, dim, it).some((v) => !displayed.has(v)),
+          itemValues(dim, it).some((v) => !displayed.has(v)),
         ).length
         out[dim] = [
           ...list.slice(0, topK),
@@ -238,7 +221,7 @@ export function aggregateDims(
       )
       if (singletons.size >= 2) {
         const otherCount = scoped.filter((it) =>
-          itemValues(category, dim, it).some((v) => singletons.has(v)),
+          itemValues(dim, it).some((v) => singletons.has(v)),
         ).length
         out[dim] = [
           ...list.filter((x) => x.count > 1),
@@ -272,16 +255,16 @@ function filterItems(
   for (let i = 0; i < path.length; i++) {
     const step = path[i]
     if (step.value !== OTHER_FACET_VALUE) {
-      scope = scope.filter((item) => itemValues(category, step.dim, item).includes(step.value))
+      scope = scope.filter((item) => itemValues(step.dim, item).includes(step.value))
       continue
     }
-    const counts = valueCounts(category, step.dim, scope)
+    const counts = valueCounts(step.dim, scope)
     const topK = topKUnder(category, step.dim, path.slice(0, i))
     const bucket = topK === undefined
       ? new Set([...counts].filter(([, count]) => count === 1).map(([value]) => value))
       : new Set([...counts].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1))
         .slice(topK).map(([value]) => value))
-    scope = scope.filter((item) => itemValues(category, step.dim, item).some((value) => bucket.has(value)))
+    scope = scope.filter((item) => itemValues(step.dim, item).some((value) => bucket.has(value)))
   }
   return scope
 }

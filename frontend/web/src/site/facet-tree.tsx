@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import type { ReactNode } from 'react'
-import { BookOpen, Clapperboard, Film, Music, Tv } from 'lucide-react'
+import { BookOpen, Clapperboard, Music } from 'lucide-react'
 
 import { TagTree } from 'weimo-ui-tagtree/components/tag-tree'
 import type { TagTreeNode } from 'weimo-ui-tagtree/components/tag-tree'
@@ -9,7 +9,6 @@ import type { DoubanDims } from './api'
 import { aggregateDims } from './facet-engine'
 import {
   GROUP_DIMENSION,
-  KIND_DIMENSION,
   PRIMARY_DIMENSION,
   escapeFacetValue,
   facetValueLabel,
@@ -24,20 +23,11 @@ import {
 } from './navigation'
 import type { MarksCategory } from './navigation'
 
-/** 一级类别根行图标（根兼任类别导航，观感对齐原导航树行）；movie 项
- *  兼作影视形态一级节点的兜底图标（无专属图标的形态值用） */
+/** 一级类别根行图标（根兼任类别导航，观感对齐原导航树行） */
 const CATEGORY_ICONS: Record<MarksCategory, ReactNode> = {
   book: <BookOpen aria-hidden="true" />,
   movie: <Clapperboard aria-hidden="true" />,
   music: <Music aria-hidden="true" />,
-}
-
-/** 影视形态一级节点图标：电影/电视剧专属，其余形态值（「分类中」
- *  未细分桶等）回退 Clapperboard——与其他类别根同观感，不作进行中
- *  示意（富集暂态避免视觉干扰） */
-const KIND_ICONS: Record<string, ReactNode> = {
-  电影: <Film aria-hidden="true" />,
-  电视剧: <Tv aria-hidden="true" />,
 }
 
 type TagAction = {
@@ -54,7 +44,7 @@ type TreeIndex = {
 
 /** 主维度值叶构建（条件聚合按 filters 前缀，叶路径= filters+叶步）：
  *  挂分组值叶下（三层，topKUnder 封顶语境），分组维度无值的兜底
- *  路径与音乐直挂形态节点/类别根下（两层，singleton 合并语境） */
+ *  路径与音乐直挂类别根下（两层，singleton 合并语境） */
 function buildPrimaryLeaves(
   category: MarksCategory,
   items: DoubanDims['items'],
@@ -117,50 +107,15 @@ function buildGroupedChildren(
   return children
 }
 
-/** 影视形态一级节点：各形态（is_tv 派生：电影/电视剧/分类中，计数取
- *  全局聚合）直接作一级节点——无「影视」类别根（原挂其下，提升后少
- *  一层钻取），图标对齐类别根观感；其下走 buildGroupedChildren 的
- *  国家/地区值叶→类型值叶三层（分组维度全无值兜底回两层）。形态行
- *  点击=单步筛选，值叶点击=形态+维度多条件 */
-function buildMovieNodes(
-  items: DoubanDims['items'],
-  byTag: Map<string, TagAction>,
-): TagTreeNode[] {
-  const kindKey = KIND_DIMENSION?.key
-  if (!kindKey) return []
-  const rootCounts = aggregateDims('movie', items)
-  return (rootCounts[kindKey] ?? []).map(({ value, count }) => {
-    const kindTag = `movie/${kindKey}/${escapeFacetValue(value)}`
-    byTag.set(kindTag, { category: 'movie', path: [{ dim: kindKey, value }] })
-    return {
-      tag: kindTag,
-      // label 走展示名映射：pending 形态归「影视」（URL/tag 语义值
-      // 不变）；电影/电视剧原样
-      label: facetValueLabel('movie', kindKey, value),
-      itemCount: count,
-      icon: KIND_ICONS[value] ?? CATEGORY_ICONS.movie,
-      children: buildGroupedChildren(
-        'movie',
-        items,
-        [{ dim: kindKey, value }],
-        kindTag,
-        byTag,
-      ),
-    }
-  })
-}
-
-/** 三类别常驻树：影视无类别根——各形态节点（电影/电视剧/…，见
- *  buildMovieNodes）直接一级、与图书/音乐的类别根并列；图书/音乐为
- *  「类别根（点行=跳该类别清筛选）→ 分组值叶 → 主维度值叶」三层
- *  （图书 年代→出版社、音乐 流派→年代，见 buildGroupedChildren）。
- *  叶/形态行计数
- *  走 itemCount（tagtree 0.3.0 起渲染在行尾折叠开关左侧，与开关同占位
- *  色），图书/音乐根行亦带 itemCount=类别条目总数；计数已按降序返回
- *  直接保序；某类别缺失（未同步/拉取失败）
- *  或无值则不出根。叶 tag 保持「类别/维度(+/维度)/值」多段——中间
- *  维度不出现在行 label 但保留在 tag 语义中（选中叶的祖先自动展开
- *  按树结构生效） */
+/** 三类别常驻树（三类别同构）：「类别根（点行=跳该类别清筛选）→
+ *  分组值叶 → 主维度值叶」三层（影视 国家/地区→类型、图书 年代→
+ *  出版社、音乐 流派→年代，见 buildGroupedChildren；分组维度全无值
+ *  兜底回主维度直挂两层）。行计数走 itemCount（tagtree 0.3.0 起渲染
+ *  在行尾折叠开关左侧，与开关同占位色），根行计数=类别条目总数；
+ *  计数已按降序返回直接保序；某类别缺失（未同步/拉取失败）或无值
+ *  则不出根。叶 tag 保持「类别/维度(+/维度)/值」多段——中间维度
+ *  不出现在行 label 但保留在 tag 语义中（选中叶的祖先自动展开按树
+ *  结构生效） */
 function buildTree(
   dimsByCategory: Partial<Record<MarksCategory, DoubanDims>>,
 ): TreeIndex {
@@ -168,12 +123,6 @@ function buildTree(
   const nodes = MARKS_CATEGORIES.flatMap((category) => {
     const dims = dimsByCategory[category]
     if (!dims) return []
-    // 影视：形态节点多个直接作一级；图书/音乐：单类别根，其下走
-    // buildGroupedChildren 三层（分组值叶→主维度值叶，分组全无值
-    // 兜底回主维度直挂两层）
-    if (category === 'movie' && KIND_DIMENSION) {
-      return buildMovieNodes(dims.items, byTag)
-    }
     const children = buildGroupedChildren(
       category,
       dims.items,
@@ -197,11 +146,10 @@ function buildTree(
   return { nodes, byTag }
 }
 
-/** 分面筛选树（纯展示 + 路径回调）：图书/音乐的一级类别根点行=跳该
- *  类别清筛选（onPathSelect 上抛空路径，展开/收起仍走行内折叠开关）；
- *  影视形态节点（一级）与各值叶是筛选条件——点击设路径（已选同路径
- *  再点取消），跨类别值叶交上层跳路由。展开态受控由上层持有（选中
- *  叶的祖先链 TagTree 会自动展开） */
+/** 分面筛选树（纯展示 + 路径回调）：一级类别根点行=跳该类别清筛选
+ *  （onPathSelect 上抛空路径，展开/收起仍走行内折叠开关）；各值叶是
+ *  筛选条件——点击设路径（已选同路径再点取消），跨类别值叶交上层跳
+ *  路由。展开态受控由上层持有（选中叶的祖先链 TagTree 会自动展开） */
 export function FacetTree({
   activeCategory,
   dimsByCategory,

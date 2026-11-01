@@ -1,11 +1,10 @@
-import { CATEGORY_NOUNS, MOVIE_KIND_VALUES } from './navigation.ts'
 import type { MarksCategory, NavTarget } from './navigation'
 
 /** 分面维度的展示顺序与文案（键集合由后端保证，顺序与命名归前端）。
  *  作 URL ?facet= 白名单校验与 meta 行文案；树上按维度另配展示规则：
- *  影视各形态走 is_tv→country 值叶→主维度、图书/音乐走分组值叶→
- *  主维度 三层（见 GROUP_DIMENSION/PRIMARY_DIMENSION），country 值叶
- *  封顶（条目 topK=5），分组之下的主维度封顶为条件规则——均见
+ *  三类别同构走分组值叶→主维度两层值叶（见
+ *  GROUP_DIMENSION/PRIMARY_DIMENSION），country 值叶封顶（条目
+ *  topK=5），分组之下的主维度封顶为条件规则——均见
  *  facet-engine topKUnder */
 export const DIMENSIONS: Record<
   MarksCategory,
@@ -13,7 +12,6 @@ export const DIMENSIONS: Record<
 > = {
   movie: [
     { key: 'genre', label: '类型' },
-    { key: 'is_tv', label: '形态' },
     // topK：树上仅展示计数前五的值，其余收进其他桶（facet-engine 聚合
     // 与 __other__ 匹配同源此值）；otherLabel：其他桶展示名（缺省
     // 「其他+维度名」→ 此处按需作「其他地区」）
@@ -47,9 +45,9 @@ export const PRIMARY_DIMENSION: Record<
   music: { key: 'decade', label: '年代' },
 }
 
-/** 主维度之上的分组维度（树为 根/形态 → 分组值叶 → 主维度值叶 三层，
- *  值叶均按计数降序）：影视=country（挂各形态一级节点下）、图书=
- *  decade、音乐=genre（挂类别根下；decade 由 year 每 10 年派生）。
+/** 主维度之上的分组维度（树为 类别根 → 分组值叶 → 主维度值叶 三层，
+ *  值叶均按计数降序）：影视=country、图书=decade、音乐=genre（均挂
+ *  类别根下；decade 由 year 每 10 年派生）。
  *  分组值叶自身封顶走 DIMENSIONS 条目 topK（country=5，decade/genre
  *  不封顶），分组之下的主维度值叶封顶是条件规则——facet-engine
  *  topKUnder 按本表判定 */
@@ -62,34 +60,19 @@ export const GROUP_DIMENSION: Record<
   music: { key: 'genre', label: '流派' },
 }
 
-/** 影视的形态层维度（is_tv 派生：电影/电视剧/分类中），树中提升为
- *  一级节点（无「影视」类别根，与图书/音乐类别根并列），主维度值叶
- *  挂其下；其余类别无此层 */
-export const KIND_DIMENSION: { key: 'is_tv'; label: string } | null =
-  { key: 'is_tv', label: '形态' }
-
 /** 后端长尾合并的保留字面量（计数 1 的值聚合进它，仅影视类型与图书
  *  出版社开启；topK 封顶的其余桶亦复用它——country 值叶与 country
  *  下的 genre 三级，同一次聚合封顶与 singleton 二选一，见
  *  facet-engine），与后端 facets::OTHER_VALUE 对齐 */
 export const OTHER_FACET_VALUE = '__other__'
 
-/** 值的展示名：影视 pending 形态归聚合名「影视」（该桶即未细分的影视
- *  混合，树节点/面包屑同源；URL/tag 语义值不变仍是「分类中」）；保留
- *  字面量 → 维度配置的 otherLabel（其他地区），缺省「其他+维度名」
- *  （其他类型/其他出版社），其余原样 */
+/** 值的展示名：保留字面量 → 维度配置的 otherLabel（其他地区），
+ *  缺省「其他+维度名」（其他类型/其他出版社），其余原样 */
 export function facetValueLabel(
   category: MarksCategory,
   dim: string,
   value: string,
 ): string {
-  if (
-    category === 'movie' &&
-    dim === 'is_tv' &&
-    value === MOVIE_KIND_VALUES.pending
-  ) {
-    return CATEGORY_NOUNS.movie
-  }
   if (value !== OTHER_FACET_VALUE) return value
   const entry = DIMENSIONS[category].find((d) => d.key === dim)
   return entry?.otherLabel ?? `其他${entry?.label ?? dim}`
@@ -113,7 +96,7 @@ export function facetPathKey(path: readonly FacetStep[]): string {
 }
 
 /** 筛选路径 → 树节点 tag（与 facet-tree buildTree 的拼装规则一致；
- *  选中指示用，侧边栏的类别切换展开复位也取首步形态节点 tag） */
+ *  选中指示用） */
 export function pathTag(category: NavTarget, path: readonly FacetStep[]): string {
   const [first, ...rest] = path
   let tag = `${category}/${first.dim}/${escapeFacetValue(first.value)}`

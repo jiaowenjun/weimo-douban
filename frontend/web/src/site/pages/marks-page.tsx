@@ -27,8 +27,6 @@ import {
   CATEGORY_PAST_VERBS,
   CATEGORY_UNIT_NOUNS,
   DEFAULT_MARKS_PATH,
-  MOVIE_KIND_VALUES,
-  moviePageTitle,
   parseRatingParam,
   ratingFilterLabel,
   resolveMarksView,
@@ -119,9 +117,9 @@ export function MarksPage() {
   const [searchParams] = useSearchParams()
 
   const marksCategory = view?.category
-  // 分面筛选路径（可多步 AND：影视叶为 is_tv+genre 双条件，可清除）：
-  // 解析自 URL——仅真实类别有维度白名单，all 合并视图与手改非法参数
-  // 一律按无筛选处理（非法步起截断保留合法前缀，后端仍会兜底校验）
+  // 分面筛选路径（可多步 AND，可清除）：解析自 URL——仅真实类别有
+  // 维度白名单，all 合并视图与手改非法参数一律按无筛选处理（非法步起
+  // 截断保留合法前缀，后端仍会兜底校验）
   const realCategory =
     marksCategory !== undefined && marksCategory !== 'all'
       ? marksCategory
@@ -133,12 +131,8 @@ export function MarksPage() {
   // 此参数，非法值按无筛选处理（后端仍会兜底校验）
   const rating =
     marksCategory === 'all' ? parseRatingParam(searchParams.get('rating')) : undefined
-  // 占位文案展示名：movie 随形态（真一级，无「影视」聚合名；形态步由
-  // App 的 MarksRoute 重定向保证，兜底电影），其余类别用页面标题
-  const displayTitle =
-    realCategory === 'movie'
-      ? moviePageTitle(facetPath.find((s) => s.dim === 'is_tv')?.value)
-      : (view?.pageTitle ?? '')
+  // 占位文案展示名：直接用页面标题（三类别统一「动词过的类别名」）
+  const displayTitle = view?.pageTitle ?? ''
 
   // 维度投影与侧边栏共用缓存（同 key 去重）；筛选命中 id 集由前端
   // facet-engine 算——无筛选为 undefined，筛选中数据未就绪为 null
@@ -213,8 +207,8 @@ export function MarksPage() {
         : { phase: 'error', message: marksQuery.error.message }
       : dimsQuery.isError && matchedIds === null
         ? // 筛选态下 dims 未就绪的门控错误：404 未同步归入 not-cached
-          // （首登自动同步对其生效——默认落地 /movie 必带形态筛选步，
-          // 未同步用户先撞到的就是这条路）；409 同为瞬态保持 loading，
+          // （首登自动同步对其生效——带筛选落地 /movie 的用户先撞到的
+          // 就是这条路）；409 同为瞬态保持 loading，
           // 其余才算加载失败
           dimsQuery.error instanceof DoubanDataQueryError &&
             dimsQuery.error.kind === 'not-cached'
@@ -268,7 +262,7 @@ export function MarksPage() {
   // （revision bump → 版本 key 变化 → 数据查询自动重拉；60s 常规轮询
   // 兜底），同时查任务终态——到终态停轮询收起横幅；终态后富集未清
   // （versions.subjects_pending>0，旧后端无字段按 0）仍维持 3s 版本轮
-  // 询——富集逐条落库（评分/形态归位）持续可见，pending 归零自动停。
+  // 询——富集逐条落库（评分/年份回填）持续可见，pending 归零自动停。
   // 轮询失败静默由下一 tick 重试（会话级短生命周期，任务过期清理等
   // 场景无谓报错）；存活条件用布尔（pending 数值每条富集都变，作依赖
   // 会反复重启 interval）
@@ -429,24 +423,9 @@ export function MarksPage() {
   } else {
     const hasMore = state.items.length < state.total
     const syncedDate = formatDate(state.cachedAt)
-    // meta 行名词：影视筛了电影/电视剧形态时提升为该形态（…部电影/
-    // …部电视剧）；形态步恒从后缀去除——电影/电视避免「部电影 · 电影」
-    // 重复，分类中（未细分）时「N 部影视」已是聚合表达、后缀无增量。
+    // meta 行名词：三类别统一量词名词（…部影视/…本书/…张专辑）；
     // all 合并视图为「已标记 N 条书影音」，评分筛选时后缀追加
     // 「· 我的N星标记」
-    const kindStep =
-      realCategory === 'movie'
-        ? facetPath.find((step) => step.dim === 'is_tv')
-        : undefined
-    const kindNoun =
-      kindStep &&
-      (kindStep.value === MOVIE_KIND_VALUES.movie ||
-        kindStep.value === MOVIE_KIND_VALUES.tv)
-        ? `部${kindStep.value}`
-        : null
-    const suffixPath = kindStep
-      ? facetPath.filter((step) => step.dim !== 'is_tv')
-      : facetPath
     content = (
       <>
         {syncPhase?.phase === 'syncing' ? (
@@ -462,10 +441,10 @@ export function MarksPage() {
         <p className="marks-page__meta">
           {profile?.username || uid}
           {realCategory
-            ? ` ${CATEGORY_PAST_VERBS[realCategory]} ${state.total} ${kindNoun ?? CATEGORY_UNIT_NOUNS[realCategory]}`
+            ? ` ${CATEGORY_PAST_VERBS[realCategory]} ${state.total} ${CATEGORY_UNIT_NOUNS[realCategory]}`
             : ` 已标记 ${state.total} 条书影音`}
-          {suffixPath.length > 0 && realCategory
-            ? ` · ${suffixPath
+          {facetPath.length > 0 && realCategory
+            ? ` · ${facetPath
                 .map((step) => facetValueLabel(realCategory, step.dim, step.value))
                 .join(' / ')}`
             : ''}

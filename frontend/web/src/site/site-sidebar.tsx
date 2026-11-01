@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { BookOpen, Film, Grid2X2, Music, Tv } from 'lucide-react'
+import { BookOpen, Clapperboard, Grid2X2, Music } from 'lucide-react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import { TextButton } from 'weimo-ui-core/components/text-button'
 import { TagTree, type TagTreeNode } from 'weimo-ui-tagtree/components/tag-tree'
@@ -12,13 +12,13 @@ import { FacetTree } from './facet-tree'
 import {
   facetPathKey,
   parseFacetPath,
-  pathTag,
   type FacetStep,
 } from './facet-model'
 import { SidebarHeader } from './sidebar-header'
 import { SidebarStats } from './sidebar-stats'
 import {
   ALL_MARKS_TAG,
+  isMarksCategory,
   MARKS_CATEGORIES,
   NAV_RATING_STEPS,
   parseRatingParam,
@@ -32,20 +32,14 @@ import {
 import './site-sidebar.css'
 
 /** 未登录零态筛选树（模块级静态：结构对齐 FacetTree 常驻树一级——
- *  影视形态两节点 + 图书/音乐类别根，图标同款、计数全 0、无子级）：
- *  侧边栏结构常驻不因未登录/清除 ID 塌掉；点行跳对应类别（形态两
- *  节点都归影视）。tag 无需匹配真实树语义（零态无选中/展开联动） */
+ *  三类别根同构，图标同款、计数全 0、无子级）：侧边栏结构常驻不因
+ *  未登录/清除 ID 塌掉；点行跳对应类别。tag 无需匹配真实树语义
+ *  （零态无选中/展开联动） */
 const EMPTY_FACET_NODES: TagTreeNode[] = [
   {
-    tag: 'movie/film',
-    label: '电影',
-    icon: <Film aria-hidden="true" />,
-    itemCount: 0,
-  },
-  {
-    tag: 'movie/tv',
-    label: '电视剧',
-    icon: <Tv aria-hidden="true" />,
+    tag: 'movie',
+    label: '影视',
+    icon: <Clapperboard aria-hidden="true" />,
     itemCount: 0,
   },
   {
@@ -65,12 +59,11 @@ const EMPTY_FACET_NODES: TagTreeNode[] = [
 /** 站点侧边栏：整体接管模板 sidebar 插槽，布局对齐 weimo-biji 的
  *  biji-side-bar——身份栏固定在顶，滚动主体依次为标记统计区
  *  （StatGroup/Heatmap）→ 导航区（全部标记，下挂我的评分子节点）→
- *  分面筛选树（影视各形态提升一级、图书/音乐为分组值叶→主维度值叶
- *  三层；类别根/形态节点带图标，图书/音乐根点行=跳该类别清筛选兼任
- *  导航，影视形态节点点行=设形态筛选）。
+ *  分面筛选树（三类别同构：类别根→分组值叶→主维度值叶三层；类别根
+ *  带图标，点行=跳该类别清筛选兼任导航）。
  *  筛选路径经 URL ?facet=dim=value;… 与列表页共享（侧边栏写、列表页
- *  读，影视叶为 is_tv+genre 双条件）；评分筛选走 ?rating=N（仅全部
- *  标记视图）；类别切换天然清除筛选。
+ *  读）；评分筛选走 ?rating=N（仅全部标记视图）；类别切换天然清除
+ *  筛选。
  *  onClose 供窄屏抽屉在选中后收起 */
 export function SiteSidebar({ onClose }: { onClose: () => void }) {
   const navigate = useNavigate()
@@ -179,18 +172,11 @@ export function SiteSidebar({ onClose }: { onClose: () => void }) {
   >(null)
   if (category !== expandedCategory) {
     setExpandedCategory(category)
-    // 类别切换重置展开态：图书/音乐展开类别根；影视无类别根（形态
-    // 节点一级），带形态筛选进入时展开首步形态节点——选中叶的祖先
-    // 自动展开覆盖不到形态根自身，无筛选则收起（形态行一级可见，
-    // 点击筛选时自行展开）；all 亦无根可展
+    // 类别切换重置展开态：展开类别根（三类别同构）；all 无根可展
     setExpandedTags(
-      category === 'movie'
-        ? path.length > 0
-          ? [pathTag('movie', path.slice(0, 1))]
-          : []
-        : category !== undefined && category !== ALL_MARKS_TAG
-          ? [category]
-          : [],
+      category !== undefined && category !== ALL_MARKS_TAG
+        ? [category]
+        : [],
     )
   }
 
@@ -245,11 +231,8 @@ export function SiteSidebar({ onClose }: { onClose: () => void }) {
     <TagTree
       nodes={EMPTY_FACET_NODES}
       onSelect={(tag) => {
-        // 零态无子级无筛选：点行只跳类别（影视形态两节点都归影视）
-        handlePathSelect(
-          tag === 'book' || tag === 'music' ? tag : 'movie',
-          [],
-        )
+        // 零态无子级无筛选：点行只跳对应类别
+        if (isMarksCategory(tag)) handlePathSelect(tag, [])
       }}
       variant="no-action"
     />

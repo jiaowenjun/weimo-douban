@@ -3,8 +3,6 @@ import { SiteTemplate } from 'weimo-ui-template/components/site-template'
 import { TagBread } from 'weimo-ui-tagtree/components/tag-bread'
 
 import { DoubanUserProvider } from './site/douban-user-provider'
-import { useDoubanDimsQuery } from './site/douban-queries'
-import { useDoubanUser } from './site/douban-user'
 import {
   facetPathKey,
   facetValueLabel,
@@ -13,9 +11,6 @@ import {
 import {
   CATEGORY_NOUNS,
   DEFAULT_MARKS_PATH,
-  DEFAULT_MOVIE_KIND,
-  MOVIE_KIND_VALUES,
-  moviePageTitle,
   resolveMarksView,
 } from './site/navigation'
 import { TopBarExport } from './site/marks-export'
@@ -33,13 +28,10 @@ function useMarksViewFromLocation() {
   return resolveMarksView(category)
 }
 
-/** 顶栏前置区：真实类别页常显标签面包屑。图书/音乐为「类别名/步骤
- *  值…」（无筛选单段类别名，page 级不可点）；movie 无类别段——首步
- *  形态值（电影/电视剧）即根段（真一级，无「影视」聚合名；裸 /movie
- *  已被 MarksRoute 重定向补形态步，理论必有）。点中间级=截断到该步
- *  （movie 根段点击=截到形态单步，图书/音乐根级点击=清空回全量）；
- *  all 返回 undefined，回落模板默认的 pageTitle 标签（pageTitle
- *  始终驱动 document.title） */
+/** 顶栏前置区：真实类别页常显标签面包屑「类别名/步骤值…」（无筛选
+ *  单段类别名，page 级不可点）。点中间级=截断到该步（根级点击=清空
+ *  回全量）；all 返回 undefined，回落模板默认的 pageTitle 标签
+ *  （pageTitle 始终驱动 document.title） */
 function useFacetBreadcrumb() {
   const { pathname } = useLocation()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -50,19 +42,14 @@ function useFacetBreadcrumb() {
   const stepLabels = path.map((step) =>
     facetValueLabel(category, step.dim, step.value),
   )
-  const tag = (
-    category === 'movie'
-      ? stepLabels
-      : [CATEGORY_NOUNS[category], ...stepLabels]
-  ).join('/')
+  const tag = [CATEGORY_NOUNS[category], ...stepLabels].join('/')
   if (!tag) return undefined
 
   return (
     <TagBread
       onSelect={(sub) => {
-        // sub 为截至该级的路径，kept=保留的步骤数：图书/音乐首级是
-        // 类别名 kept=0=清空；movie 首级即形态步 kept=1（值可能含 /
-        // 的边缘场景按段数截断）
+        // sub 为截至该级的路径，kept=保留的步骤数：首级是类别名
+        // kept=0=清空（值可能含 / 的边缘场景按段数截断）
         const kept = sub.split('/').length - 1
         setSearchParams(
           kept > 0 ? { facet: facetPathKey(path.slice(0, kept)) } : {},
@@ -73,63 +60,13 @@ function useFacetBreadcrumb() {
   )
 }
 
-/** /:category 路由外壳：movie 的电影/电视剧是真一级——无形态步
- *  （is_tv）的路径（裸 /movie 或手改 URL 缺步）重定向规范为补默认
- *  形态前置步、保留其余步骤（replace 不留历史），「影视」聚合页随之
- *  不复存在。默认值按形态数据就绪度选：任一条目 is_tv 已富集（维度
- *  完成+富集出首批）→「电影」；未就绪（首发同步中/富集排队，全部
- *  归分类中）→ 降级「分类中」合并视图，渐进条目直接可读。就绪后
- *  下次导航自然规范化（停留不跳变——Navigate 后本组件已卸载） */
-function MarksRoute() {
-  const { pathname } = useLocation()
-  const [searchParams] = useSearchParams()
-  const isMovie = pathname.split('/')[1] === 'movie'
-  const { uid } = useDoubanUser()
-  // 与侧边栏共享同一 query key（命中缓存零新增请求）；非 movie 路由
-  // 传 null 保持禁用
-  const dimsQuery = useDoubanDimsQuery(
-    isMovie && uid ? uid : null,
-    isMovie ? 'movie' : null,
-  )
-  if (isMovie) {
-    const path = parseFacetPath('movie', searchParams.get('facet'))
-    if (!path.some((step) => step.dim === 'is_tv')) {
-      const kindReady = dimsQuery.data
-        ? dimsQuery.data.items.some((item) => item.dims.is_tv !== undefined)
-        : false
-      const canonical = facetPathKey([
-        {
-          dim: 'is_tv',
-          value: kindReady ? DEFAULT_MOVIE_KIND : MOVIE_KIND_VALUES.pending,
-        },
-        ...path,
-      ])
-      return (
-        <Navigate
-          replace
-          to={`/movie?facet=${encodeURIComponent(canonical)}`}
-        />
-      )
-    }
-  }
-  return <MarksPage />
-}
-
 function SiteShell() {
-  const [searchParams] = useSearchParams()
   const { pathname } = useLocation()
   const view = useMarksViewFromLocation()
   const topBarLeading = useFacetBreadcrumb()
-  // movie 标题随形态（真一级，无「影视」聚合名；形态步由 MarksRoute
-  // 保证存在，find 不到仅重定向前一帧的兜底）；其余类别/全部标记原样
-  // （pageTitle 始终驱动 document.title）
-  const pageTitle = view && view.category === 'movie'
-      ? moviePageTitle(
-          parseFacetPath('movie', searchParams.get('facet')).find(
-            (step) => step.dim === 'is_tv',
-          )?.value,
-        )
-      : view?.pageTitle
+  // 「动词过的类别名」三类别统一（看过的影视/读过的图书/听过的音乐），
+  // 始终驱动 document.title
+  const pageTitle = view?.pageTitle
 
   // 根路径 = 欢迎页（营销页）：自带 MiniSiteTemplate 独立壳（无侧边栏、
   // hero 标题区），不套 SiteTemplate 应用壳。分支置于全部 hooks 之后——
@@ -160,7 +97,7 @@ function SiteShell() {
           element={<Navigate replace to={DEFAULT_MARKS_PATH} />}
           path="/settings"
         />
-        <Route element={<MarksRoute />} path="/:category" />
+        <Route element={<MarksPage />} path="/:category" />
         <Route
           element={<Navigate replace to={DEFAULT_MARKS_PATH} />}
           path="*"
