@@ -13,3 +13,16 @@
     align-items: center;
   }
 }
+
+/* 顶栏灵动岛居中于内容区而非整个顶栏 frame：本站应用壳左侧有常驻侧栏
+   （SiteTemplate sidebar 插槽），core 的 .top-bar__center 默认在 frame
+   全宽上几何居中，宽屏下视觉偏左约半侧栏宽。--top-bar-center-inset
+   （core ≥0.3.3）把居中区域行首锚点右移到内容列起点 = 侧栏宽 + 布局
+   gap（模板 __layout 的 gutter×1.6），岛即居中于内容列。断点对齐模板
+   sidebar-space 的显隐（≥700px 常驻、以下收抽屉）；:has 作用域确保
+   欢迎页（MiniSiteTemplate 无侧栏壳）不受影响 */
+@media (min-width: 700px) {
+  #root:has(.weimo-site-template__sidebar-space) {
+    --top-bar-center-inset: calc(var(--size-sidebar-width) + var(--space-gutter) * 1.6);
+  }
+}
