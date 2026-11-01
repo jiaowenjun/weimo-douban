@@ -3,8 +3,8 @@ import type { MarksCategory, NavTarget } from './navigation'
 /** 分面维度的展示顺序与文案（键集合由后端保证，顺序与命名归前端）。
  *  作 URL ?facet= 白名单校验与 meta 行文案；树上按维度另配展示规则：
  *  三类别同构走分组值叶→主维度两层值叶（见
- *  GROUP_DIMENSION/PRIMARY_DIMENSION），country 值叶封顶（条目
- *  topK=5），分组之下的主维度封顶为条件规则——均见
+ *  GROUP_DIMENSION/PRIMARY_DIMENSION），country/genre 值叶封顶
+ *  （条目 topK=5），分组之下的主维度封顶为条件规则——均见
  *  facet-engine topKUnder */
 export const DIMENSIONS: Record<
   MarksCategory,
@@ -26,7 +26,9 @@ export const DIMENSIONS: Record<
     { key: 'decade', label: '年代' },
   ],
   music: [
-    { key: 'genre', label: '流派' },
+    // topK 同 country：流派值叶收计数前五，其余进其他桶——默认
+    // otherLabel 拼法即「其他流派」，无须另配
+    { key: 'genre', label: '流派', topK: 5 },
     { key: 'singer', label: '歌手' },
     { key: 'decade', label: '年代' },
   ],
@@ -48,9 +50,9 @@ export const PRIMARY_DIMENSION: Record<
 /** 主维度之上的分组维度（树为 类别根 → 分组值叶 → 主维度值叶 三层，
  *  值叶均按计数降序）：影视=country、图书=decade、音乐=genre（均挂
  *  类别根下；decade 由 year 每 10 年派生）。
- *  分组值叶自身封顶走 DIMENSIONS 条目 topK（country=5，decade/genre
- *  不封顶），分组之下的主维度值叶封顶是条件规则——facet-engine
- *  topKUnder 按本表判定 */
+ *  分组值叶自身封顶走 DIMENSIONS 条目 topK（country=genre=5，
+ *  decade 不封顶），分组之下的主维度值叶封顶是条件规则——
+ *  facet-engine topKUnder 按本表判定 */
 export const GROUP_DIMENSION: Record<
   MarksCategory,
   { key: string; label: string } | null

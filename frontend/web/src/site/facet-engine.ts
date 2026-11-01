@@ -25,7 +25,8 @@ const DIM_FIELDS: Record<string, string> = {
 }
 
 /** 长尾合并的维度开关：仅树上展示且长尾明显的维度开启——影视类型、
- *  图书出版社；音乐流派不合并（值数少，singleton 保留原样更直观） */
+ *  图书出版社；音乐流派走 topK 封顶收其他桶（封顶语境优先且独占，
+ *  singleton 合并不参与），不另开 singleton 合并 */
 function mergeEnabled(category: MarksCategory, dim: string): boolean {
   return (
     (category === 'movie' && dim === 'genre') ||
@@ -61,8 +62,8 @@ const PRIMARY_TOP_K = 5
 
 /** 维度在给定步骤序列下的树上展示值上限：主维度仅当序列含本类别
  *  分组维度步时封顶（PRIMARY_TOP_K），其余场合（分组维度无值的
- *  兜底两层、音乐主维度直挂）不封顶、走 singleton 合并；分组维度
- *  自身（country）恒为 DIMENSIONS 配置的 topK——展示聚合（传
+ *  兜底两层等）不封顶、走 singleton 合并；分组维度
+ *  自身（country/genre）恒为 DIMENSIONS 配置的 topK——展示聚合（传
  *  filters）与 __other__ 匹配（传该步前缀）两侧同源此判定，口径唯一 */
 function topKUnder(
   category: MarksCategory,

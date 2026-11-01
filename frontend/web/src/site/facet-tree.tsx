@@ -43,8 +43,8 @@ type TreeIndex = {
 }
 
 /** 主维度值叶构建（条件聚合按 filters 前缀，叶路径= filters+叶步）：
- *  挂分组值叶下（三层，topKUnder 封顶语境），分组维度无值的兜底
- *  路径与音乐直挂类别根下（两层，singleton 合并语境） */
+ *  挂分组值叶下（三层，topKUnder 封顶语境），分组维度全无值的兜底
+ *  直挂类别根下（两层，singleton 合并语境） */
 function buildPrimaryLeaves(
   category: MarksCategory,
   items: DoubanDims['items'],
@@ -69,9 +69,9 @@ function buildPrimaryLeaves(
 }
 
 /** 分组值叶 + 其下主维度值叶（三层钻取的下两层，分组维度见
- *  GROUP_DIMENSION）：分组值叶挂 parent 下（条件聚合，country 值叶
- *  自身 topK 封顶、decade 不封顶），每片叶再挂主维度值叶；无分组
- *  维度（音乐）或分组维度全无值时兜底回主维度直挂（两层） */
+ *  GROUP_DIMENSION）：分组值叶挂 parent 下（条件聚合，country/genre
+ *  值叶自身 topK 封顶、decade 不封顶），每片叶再挂主维度值叶；无分组
+ *  维度或分组维度全无值时兜底回主维度直挂（两层） */
 function buildGroupedChildren(
   category: MarksCategory,
   items: DoubanDims['items'],
