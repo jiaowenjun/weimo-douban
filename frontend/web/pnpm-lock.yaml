@@ -39,8 +39,8 @@ importers:
         specifier: ~0.5.1
         version: 0.5.1(@base-ui/react@1.9.0(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(weimo-ui-core@0.3.3(@base-ui/react@1.9.0(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))
       weimo-ui-template:
-        specifier: ^0.4.6
-        version: 0.4.6(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(weimo-ui-core@0.3.3(@base-ui/react@1.9.0(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))
+        specifier: ^0.4.7
+        version: 0.4.7(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(weimo-ui-core@0.3.3(@base-ui/react@1.9.0(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))
       weimo-wdf:
         specifier: ^0.1.0
         version: 0.1.0
@@ -1096,8 +1096,8 @@ packages:
       react-dom: ^19.0.0
       weimo-ui-core: ~0.3.0
 
-  weimo-ui-template@0.4.6:
-    resolution: {integrity: sha512-XB3S4ifPF/yyVePNnhWJ2URJg+JIKkMgD9HANO+6wofjZANfWjuf1RZMTmlM3DqLa6o+gqJTTQuDVr5c6KckSg==}
+  weimo-ui-template@0.4.7:
+    resolution: {integrity: sha512-oKFytMpzoIuRk5Z2Ha9SdZvklOZYjsUC5t0euOfJyD67ffbirjoEly2tGPImRfzkHe8qbrjPGqybNCdtTygT7g==}
     peerDependencies:
       react: ^19.0.0
       react-dom: ^19.0.0
@@ -2003,7 +2003,7 @@ snapshots:
     transitivePeerDependencies:
       - '@types/react'
 
-  weimo-ui-template@0.4.6(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(weimo-ui-core@0.3.3(@base-ui/react@1.9.0(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)):
+  weimo-ui-template@0.4.7(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(weimo-ui-core@0.3.3(@base-ui/react@1.9.0(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)):
     dependencies:
       lucide-react: 1.63.0(@types/react@19.3.0)(react@19.3.1)
       react: 19.3.1
