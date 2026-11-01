@@ -1,7 +1,7 @@
 /* 灵动岛遮挡改善方案对比演示（#/island-demo）：页面布局 + v1/v2/v3
    三套变体的顶栏效果。方案开关键于 #root[data-island-demo]（页面按
-   选择写入），与生产拟采用的 :has(.top-bar-notice[data-visible])
-   选择器机制同构——演示页验证的就是生产机制本身 */
+   选择写入）；v1 让位=岛组件实测遮叠挂类（生产同款机制），
+   v2/v3=纯 CSS :has(.top-bar-notice[data-visible]) 可见性门 */
 
 .island-demo {
   display: grid;
@@ -64,10 +64,11 @@
   font-size: var(--font-size-sm);
 }
 
-/* —— v1 让位避让：岛可见时前置标题渐隐让路（内容绕开岛，岛主权
-   不动）；岛收起后标题延迟回弹——transition-delay 留足收拢退场
-   （transform 260ms + 余量），否则标题在岛缩回途中弹回又撞一次。
-   隐藏方向 delay 归零即时让位 */
+/* —— v1 让位避让（左）：标题与右侧钮统一「实测遮叠」判定（压到才
+   藏，island-demo-yield 由岛组件按矩形遮叠挂/摘——纯 CSS :has 版
+   只看岛可见，宽幅无遮叠下标题整段岛期白藏，已退役）；岛收起后
+   延迟回弹——transition-delay 留足收拢退场（transform 260ms +
+   余量），否则标题在岛缩回途中弹回又撞一次 */
 /* 长标题可收缩：frosted-label 自带 nowrap 且无溢出处理，作 flex 项
    min-content=整串宽缩不动，左槽不够时挤压全落在侧边栏按钮上（按钮
    被挤窄实测）——标签放开 min-width 让收缩、截尾省略号由内层文本
@@ -91,7 +92,19 @@
   flex: none;
 }
 
-#root[data-island-demo='v1']:has(.top-bar-notice[data-visible='true']) .island-demo-leading {
+.island-demo-leading.island-demo-yield {
+  opacity: 0;
+  transition-delay: 0ms;
+}
+
+/* v1 右侧让位：被岛实测压到的右侧钮逐个渐隐（锚到 button 一钮一档，
+   搜索被压导出未必；判定与左侧标题同一 effect 统一驱动）；时序同款
+   ——即时让位、岛退场后 320ms 延迟回弹 */
+#root[data-island-demo='v1'] .top-bar__slot--right button {
+  transition: opacity 240ms ease 320ms;
+}
+
+#root[data-island-demo='v1'] .top-bar__slot--right button.island-demo-yield {
   opacity: 0;
   transition-delay: 0ms;
 }
@@ -164,6 +177,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .island-demo-leading,
+  #root[data-island-demo='v1'] .top-bar__slot--right button,
   .island-demo-drop-host {
     transition-duration: 1ms;
   }

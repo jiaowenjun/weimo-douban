@@ -28,7 +28,8 @@ const ISLAND_DEMO_VARIANTS: Array<{
   {
     id: 'v1',
     name: 'v1 让位避让',
-    summary: '岛可见时标题渐隐让路、退出后延迟回弹（纯 CSS :has，内容绕开岛）',
+    summary:
+      '标题与右侧钮统一实测遮叠让位（压到才藏），退出后延迟回弹',
   },
   {
     id: 'v2',
@@ -79,6 +80,50 @@ export function IslandDemoNotice() {
       if (holdTimer !== undefined) clearTimeout(holdTimer)
     }
   }, [demo.run])
+
+  // v1 让位避让：标题与右侧钮统一按「实测遮叠」判定——岛宽随进度
+  // 文案变、遮叠与否随视口/标题长短变，媒体查询与 :has 都近似不了
+  // （:has 版只看岛可见，宽幅无遮叠下标题整段岛期白藏，实测抓到）。
+  // 逐元素比对矩形（含 8px 余量），被压到的挂让位类；岛不可见
+  // （data-visible=false）全摘，回弹延迟交给 css 基态的
+  // transition-delay。挂类走 DOM：右侧钮非演示组件，统一逐元素粒度
+  useEffect(() => {
+    if (demo.variant !== 'v1') return
+    const noticeEl = document.querySelector('.top-bar-notice')
+    if (!noticeEl) return
+    const MARGIN = 8
+    const update = () => {
+      const visible = noticeEl.getAttribute('data-visible') === 'true'
+      const island = noticeEl.getBoundingClientRect()
+      const targets = [
+        document.querySelector('.island-demo-leading'),
+        ...document.querySelectorAll('.top-bar__slot--right button'),
+      ]
+      for (const el of targets) {
+        if (!el) continue
+        const rect = el.getBoundingClientRect()
+        const hit =
+          visible &&
+          island.width > 0 &&
+          rect.left < island.right + MARGIN &&
+          rect.right > island.left - MARGIN
+        el.classList.toggle('island-demo-yield', hit)
+      }
+    }
+    update()
+    const observer = new ResizeObserver(update)
+    observer.observe(noticeEl)
+    observer.observe(document.documentElement)
+    // 标题宽度随「长标题」开关变，遮叠状态须随测
+    const leadingEl = document.querySelector('.island-demo-leading')
+    if (leadingEl) observer.observe(leadingEl)
+    return () => {
+      observer.disconnect()
+      document
+        .querySelectorAll('.island-demo-yield')
+        .forEach((el) => el.classList.remove('island-demo-yield'))
+    }
+  }, [demo.variant, demo.active])
 
   const text = demo.done
     ? '同步完成，共 291 条'
