@@ -51,12 +51,12 @@ curl -H "Authorization: Bearer my-secret" \
 
 ## macOS 桌面 App（app/）
 
-Tauri 2 全栈封装：backend 以 lib 内嵌、前端 dist 编进二进制，单进程在回环随机端口同时服务 API 与静态资源，窗口加载同源 `/douban/`——零 CORS、零跨进程、不依赖线上服务器。桌面形态：菜单栏常驻（LSUIElement + 托盘，关窗后台任务继续）、GitHub Releases 自动更新：
+Tauri 2 全栈封装：backend 以 lib 内嵌、前端 dist 编进二进制，单进程在回环随机端口同时服务 API 与静态资源，窗口加载同源 `/douban/`——零 CORS、零跨进程、不依赖线上服务器。桌面形态：菜单栏常驻（LSUIElement + 托盘，关窗后台任务继续）、自动更新走 Gitee 国内源（GitHub Releases 回退，主要用户群在大陆）：
 
 ```bash
 pnpm --dir app install
 pnpm --dir app tauri build          # 产出 .app / .dmg / 更新签名产物
-./app/scripts/release.sh            # 发布：gh release + latest.json
+./app/scripts/release.sh            # 发布：gh release + latest.json + Gitee 镜像同步
 ```
 
 详见 [app/README.md](app/README.md)。

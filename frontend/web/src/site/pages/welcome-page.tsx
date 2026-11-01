@@ -13,9 +13,11 @@ import marksOverviewLight from './assets/marks-overview-light.png'
 import './welcome-page.css'
 
 /** 桌面 App 版本与双平台安装包直链（hero CTA 次按钮）：版本号与
- *  app/tauri.conf.json 的 version 保持同步；资产名是 release.sh 统一的
- *  ASCII 前缀（gh 上传会剥掉 CJK 文件名，此处的 latest/download 直链按
- *  产物名精确匹配），APP_VERSION 仍是版本号唯一改点 */
+ *  app/tauri.conf.json 的 version 保持同步；直链走 Gitee 国内镜像（主要
+ *  用户群在大陆，GitHub 直链常不可达）——镜像由 release.sh 发版时自动
+ *  同步，URL 带具体版本 tag（Gitee 无 GitHub 的 latest 别名），APP_VERSION
+ *  仍是版本号唯一改点；资产名是 release.sh 统一的 ASCII 前缀（gh 上传
+ *  会剥掉 CJK 文件名） */
 const APP_VERSION = '0.5.0'
 /** 上面的发布日期（页脚展示）：= GitHub Release v{APP_VERSION} 的发布日
  *  （当天本地日期，YYYY-MM-DD），随版本 bump 同步改——部署规范要求
@@ -24,10 +26,11 @@ const APP_VERSION = '0.5.0'
  *  App，页脚是两端的对齐凭据）。计划日与实际发布日不符时以实际为准，
  *  改此处后重走 web 构建 */
 const APP_RELEASE_DATE = '2026-11-01'
-const APP_DMG_URL = `https://github.com/jiaowenjun/weimo-douban/releases/latest/download/weimo-douban_${APP_VERSION}_aarch64.dmg`
-const APP_EXE_URL = `https://github.com/jiaowenjun/weimo-douban/releases/latest/download/weimo-douban_${APP_VERSION}_x64-setup.exe`
+const APP_DMG_URL = `https://gitee.com/jiaowenjun/weimo-douban/releases/download/v${APP_VERSION}/weimo-douban_${APP_VERSION}_aarch64.dmg`
+const APP_EXE_URL = `https://gitee.com/jiaowenjun/weimo-douban/releases/download/v${APP_VERSION}/weimo-douban_${APP_VERSION}_x64-setup.exe`
+/** other 平台回落入口：Gitee 发行版列表页（同镜像域，大陆可达） */
+const GITEE_RELEASES_URL = 'https://gitee.com/jiaowenjun/weimo-douban/releases'
 const REPO_URL = 'https://github.com/jiaowenjun/weimo-douban'
-const RELEASES_URL = `${REPO_URL}/releases/latest`
 
 /** 是否运行在 Tauri 桌面 App 壳内：Tauri 2 对壳内每个 webview（含
  *  External URL，窗口加载的是内嵌服务器的 http://127.0.0.1/douban/）在
@@ -161,7 +164,7 @@ const DOWNLOAD_CTA: Record<DownloadPlatform, { href: string; label: string }> =
   {
     mac: { href: APP_DMG_URL, label: 'Mac 客户端' },
     windows: { href: APP_EXE_URL, label: 'Windows 客户端' },
-    other: { href: RELEASES_URL, label: '下载客户端' },
+    other: { href: GITEE_RELEASES_URL, label: '下载客户端' },
   }
 
 /** 各平台按钮图标（与 DOWNLOAD_CTA 同键） */

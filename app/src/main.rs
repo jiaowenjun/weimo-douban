@@ -10,8 +10,8 @@
 //! 桌面形态两件套：
 //! - 菜单栏常驻：LSUIElement（无 Dock 图标）+ 托盘菜单，关窗=隐藏，
 //!   进程与订阅轮询/富集后台任务持续推进；
-//! - 自动更新：tauri-plugin-updater，manifest 默认走 GitHub Releases
-//!   latest-download 重定向（SYNC_UPDATER_URL 可覆盖），启动静默自检 +
+//! - 自动更新：tauri-plugin-updater，manifest 走 Gitee 国内源（GitHub
+//!   Releases 回退，SYNC_UPDATER_URL 可覆盖），启动静默自检 +
 //!   托盘手动检查，minisign 签名校验后安装重启。
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
@@ -34,10 +34,16 @@ use weimo_douban::server::config::ServerConfig;
 /// 前端静态资源挂载前缀（与生产站点 weimo.ink/douban/ 及 vite base 一致）
 const WEB_MOUNT: &str = "/douban";
 
-/// 更新 manifest 默认地址：GitHub Releases 的 latest/download 重定向（仓库
-/// 公开，免鉴权）；SYNC_UPDATER_URL 可覆盖（自托管 / 本地联调）
-const UPDATER_ENDPOINT: &str =
-    "https://github.com/jiaowenjun/weimo-douban/releases/latest/download/latest.json";
+/// 更新 manifest 默认端点（按序回退）：Gitee 国内源优先——主要用户群在
+/// 大陆，GitHub 直连常不可达；数据源 = 仓库 app-latest 分支的 latest.json
+/// （发布脚本把下载直链改写成 Gitee 发行版后以孤儿提交推送到该分支，raw
+/// 直链稳定无版本号，弥补 Gitee 没有 latest/download 别名的缺口）。
+/// GitHub Releases latest-download 重定向作海外/故障回退（仓库公开，免
+/// 鉴权）。SYNC_UPDATER_URL 可覆盖为单端点（自托管 / 本地联调）
+const UPDATER_ENDPOINTS: [&str; 2] = [
+    "https://gitee.com/jiaowenjun/weimo-douban/raw/app-latest/latest.json",
+    "https://github.com/jiaowenjun/weimo-douban/releases/latest/download/latest.json",
+];
 
 fn env_or(name: &str, default: &str) -> String {
     std::env::var(name)
@@ -326,17 +332,22 @@ fn build_tray(handle: &tauri::AppHandle) -> Result<()> {
 // 自动更新
 // --------------------------------------------------------------------------- //
 
-/// 构建更新器：默认端点为 UPDATER_ENDPOINT（GitHub Releases latest-download
-/// 重定向），SYNC_UPDATER_URL 可覆盖（自托管/本地联调；注意 release 构建仅
-/// 接受 https，http 需在 tauri.conf 开 dangerousInsecureTransportProtocol）
+/// 构建更新器：默认端点 UPDATER_ENDPOINTS 按序回退（Gitee 优先、GitHub
+/// 兜底——单端点超时或请求失败自动试下一个），SYNC_UPDATER_URL 可覆盖为
+/// 单端点（自托管/本地联调；注意 release 构建仅接受 https，http 需在
+/// tauri.conf 开 dangerousInsecureTransportProtocol）
 fn build_updater(handle: &tauri::AppHandle) -> Result<tauri_plugin_updater::Updater> {
     let mut builder = handle.updater_builder();
-    let endpoint = env_or("SYNC_UPDATER_URL", UPDATER_ENDPOINT);
-    if endpoint != UPDATER_ENDPOINT {
-        builder = builder.endpoints(vec![endpoint.parse()?])?;
+    let override_url = env_or("SYNC_UPDATER_URL", "");
+    let endpoints: Vec<tauri::Url> = if override_url.is_empty() {
+        UPDATER_ENDPOINTS
+            .iter()
+            .map(|url| url.parse::<tauri::Url>())
+            .collect::<Result<Vec<_>, _>>()?
     } else {
-        builder = builder.endpoints(vec![UPDATER_ENDPOINT.parse()?])?;
-    }
+        vec![override_url.parse::<tauri::Url>()?]
+    };
+    builder = builder.endpoints(endpoints)?;
     Ok(builder.build()?)
 }
 

@@ -43,8 +43,12 @@ Windows 无 LSUIElement 概念（该 plist 项被忽略）：App 正常显示任
 
 ### 2. 自动更新（tauri-plugin-updater）
 
-- manifest 默认端点 = GitHub Releases 的 latest/download 重定向
-  （仓库公开免鉴权）：`releases/latest/download/latest.json`；
+- manifest 端点双通道（`UPDATER_ENDPOINTS` 按序超时回退）：**Gitee 国内
+  源优先**（主要用户群在大陆，GitHub 直连常不可达）——数据源 = 仓库
+  `app-latest` 分支的 latest.json（发布脚本把下载直链改写成 Gitee 发行版
+  后以孤儿提交推送，raw 直链稳定无版本号，弥补 Gitee 无 latest/download
+  别名的缺口；raw 缓存仅 60s）；GitHub Releases latest/download 重定向
+  作海外/故障回退（仓库公开免鉴权）；
 - 启动 5s 后静默自检，发现新版本弹窗确认；托盘菜单可手动检查；
 - minisign 签名校验（`updater.pubkey` 编入二进制；私钥在
   `~/.tauri-keys/weimo-douban-updater.key`，**丢失即无法再推送更新，
@@ -58,7 +62,15 @@ Release 一致）：版本 bump 提交（四处改点：`tauri.conf.json` 与本
 并 push → 手动 dispatch `app-windows` 工作流（出 Windows 产物，mac 无法
 交叉编译）→ 本地 `./scripts/release.sh`（构建签名产物 → 拉取 Windows CI
 产物 → 生成 latest.json → `gh release` 上传双平台 dmg/exe/tar.gz/sig/
-latest.json；找不到匹配版本的 Windows 产物时自动回落仅发 macOS）→
+latest.json，找不到匹配版本的 Windows 产物时自动回落仅发 macOS；末步
+自动同步 **Gitee 国内镜像**——双推 main+tags 到 `gitee` remote + 附件
+传 Gitee 发行版 + latest.json 改写下载直链后推 `app-latest` 孤儿分支
+（App updater 的 Gitee 端点数据源，欢迎页下载直链同指 Gitee），大陆
+免梯下载/更新。令牌= `~/.gitee/token` 或 `GITEE_TOKEN`
+（[私人令牌](https://gitee.com/profile/personal_access_tokens)勾 projects；
+缺令牌/缺 remote 自动跳过，不影响 GitHub 发布））→ `gh release edit`
+换详细日志后补跑 `./scripts/release.sh --gitee-only v<版本>` 刷新 Gitee
+版面与清单分支（幂等：已在附件跳过、标题描述覆盖更新）→
 网页端按手册 §7 部署 txy 并过 §7.5.3 一致性断言。
 
 ## Windows 版（CI 构建，mac 无法交叉编译）
@@ -90,7 +102,7 @@ CI 产物资产名全 ASCII（`weimo-douban` 前缀，与 mac 同约定——gh 
 
 | 变量 | 默认 | 说明 |
 |---|---|---|
-| `SYNC_UPDATER_URL` | GitHub Releases | 更新 manifest 端点（release 构建仅接受 https；本地联调需临时开 `dangerousInsecureTransportProtocol` 重新构建） |
+| `SYNC_UPDATER_URL` | Gitee 优先+GitHub 回退 | 更新 manifest 端点覆盖（设为单端点；release 构建仅接受 https；本地联调需临时开 `dangerousInsecureTransportProtocol` 重新构建） |
 | `SYNC_UPDATE_AUTO` | 空 | `1` = 发现新版本不经确认直接装（无人值守） |
 | `SYNC_CRAWL_*` / `SYNC_SUBJECT_*` / `SYNC_DOUBAN_COOKIE` 等 | 后端默认 | 抓取/富集调参，语义与服务器部署一致（见根 README 参数表） |
 

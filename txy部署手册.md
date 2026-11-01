@@ -452,8 +452,16 @@ rm /root/workspace/douban-update.bundle                  # 本地同步删 /tmp/
 gh workflow run app-windows.yml --repo jiaowenjun/weimo-douban --ref main
 gh run watch --repo jiaowenjun/weimo-douban   # 等成功
 
-# 2) 发布 GitHub Release（mac 构建+签名 → 并入 Windows 产物 → latest.json → gh release）
+# 2) 发布 GitHub Release（mac 构建+签名 → 并入 Windows 产物 → latest.json → gh release
+#    → 末步自动同步 Gitee 国内镜像：双推 main+tags 到 gitee remote + 附件传 Gitee
+#    发行版；令牌 = ~/.gitee/token 或 GITEE_TOKEN（私人令牌勾 projects），
+#    缺令牌/缺 remote 自动跳过该步，不影响 GitHub 发布）
 cd app && TAURI_SIGNING_PRIVATE_KEY=~/.tauri-keys/weimo-douban-updater.key ./scripts/release.sh
+
+# 2b) gh release edit 换详细日志后，刷新 Gitee 镜像版面与更新清单（幂等
+#     不构建：标题描述覆盖更新、已在附件按文件名跳过、app-latest 清单
+#     分支重推；版本号换成本次值，缺省则读 tauri.conf.json）
+cd app && ./scripts/release.sh --gitee-only v0.5.0
 
 # 3) 网页端部署到 txy：走 §7 流程（bundle → 服务器构建 web → rsync）。
 #    本步构建的 web 即含新页脚；若本次还含后端变更按 §7 全量三端
@@ -479,6 +487,12 @@ curl -fsS "https://weimo.ink$JS" | grep -F -c "$DATE"   # ≥1
 
 # 3) 人工：浏览器开 https://weimo.ink/douban/ 页脚 == "v$VER · $DATE"，
 #    下载直链（CTA 按钮）可命中 v$VER 资产
+
+# 4) Gitee 国内镜像同版本（大陆下载入口，免登录）：
+curl -fsS "https://gitee.com/jiaowenjun/weimo-douban/releases/tags/v$VER" | jq -r '.tag_name'
+#   期望 v$VER；发行版页附件应为本次全套（双平台六件 / 仅 mac 四件）
+#   且更新清单（App 自动更新的 Gitee 端点，raw 缓存 60s）同版本：
+curl -fsSL "https://gitee.com/jiaowenjun/weimo-douban/raw/app-latest/latest.json" | jq -r '.version'
 ```
 
 任一断言不过即未完成完整部署：日期不符改 `APP_RELEASE_DATE` 重走 §7 web 构建与 rsync；版本不符说明 txy 产物落后或 Release 未发，回到 §7.5.2 对应步骤。
