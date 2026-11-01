@@ -47,6 +47,15 @@ WeimoDoubanNative.app（单进程 + sidecar）
 - **同步→通知端到端已真实验证**：临时数据目录 + wenjun30 music collect
   28 条实测——任务 15s 完成、`[notify] 投递 同步完成 | 共 28 条` 命中、
   subjects_pending=24 进入「详情拉取中」、marks API 返回真实 subject_url。
+- **标题栏一体化**（路线图 3.1，纯壳侧零前端改动）：fullSizeContentView +
+  透明系统标题栏 + 隐藏标题——web 顶栏顶到窗口顶，红绿灯悬浮于顶栏左侧
+  空白带。**零 CSS 让位的几何依据**：窗口最小 960px 恒 ≥700px 布局，
+  左槽内容被模板 margin 推至 ~329px；欢迎页左槽壳内为空——探针实测
+  marks 页 leftInteractive=0×0、欢迎页 null，红绿灯区（0..78 × 0..28）
+  无任何有面积的交互元素。拖拽=壳桥（顶栏条带内 mousedown 非交互元素 →
+  mouseDown 存根 performDrag；磨砂条下滚过的卡片经 closest(交互) 放行）、
+  双击空白=窗口 zoom（macOS 惯例）；布局探针（load/resize 量矩形回传
+  日志）供后续回归核验。
 - **通知**（路线图 1.1 路线 i，零后端改动）：SyncMonitor 与前端灵动岛
   同端点同口径——任务 `queued/running → completed/partial/failed` 跃迁、
   `subjects_pending >0 → 0` 跃迁发系统通知，点击唤起主窗口；首帧只建
@@ -98,14 +107,19 @@ App 默认使用微墨中心详情缓存，可在设置中关闭；中心离线�
   分发与更新方案待定（Sparkle 或独立 manifest）后再做
 - 唤起直落搜索（2.3）：等前端搜索功能实现后补一行 evaluateJavaScript
 - 深链接（1.7，无场景暂不排期）
-- **标题栏一体化（3.1）——刻意留待设计迭代**：hidden titlebar + 前端
-  安全区/红绿灯让位是 weimo-ui 双主题顶栏的视觉设计改动，需与 web 端
-  一起 IAB 截图迭代定稿，不适合壳侧自主盲改；drag 区在原生壳无 Tauri
-  的 IPC 限制（evaluateJavaScript/messageHandler 双向通道现成），工程
-  侧无阻塞
+- 跟随系统深浅色（3.2）：纯前端项（设置加「跟随系统」档，web 端同
+  受益），不属壳侧迁移
+- 标题栏一体化的**视觉微调**（如红绿灯与磨砂条的对位观感）：几何已
+  核验零碰撞，视觉定稿随 web 端设计迭代
 
-## 已知待实测
+## 已知待实测（GUI 侧留用户）
 
-- CSV 导出（blob 锚点 → WKDownload → NSSavePanel）与右键菜单交互：
-  需真实数据 + GUI 操作，留给用户核验（同步→通知链路已自动验证）。
+- 顶栏空白处拖拽窗口 / 双击 zoom、右键菜单交互、CSV 导出
+  （blob → WKDownload → NSSavePanel）：均需真实键鼠操作。
 - ad-hoc 签名下系统通知权限登记行为（首次发通知时请求授权）。
+
+## 测试钩子
+
+`WEIMO_MAC_START_URL`：覆盖窗口初始地址——完整 URL 原样用；`#/movie`
+等以 # 开头的值拼在本实例 baseURL 上（回环端口每次随机，写死端口必踩
+死链）。端到端探针/深链验证用。

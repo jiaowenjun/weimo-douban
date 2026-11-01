@@ -33,15 +33,104 @@ final class MainWindowController: NSObject, NSWindowDelegate, WKNavigationDelega
     })();
     """
 
+    /// 标题栏一体化壳桥脚本（路线图 3.1）：
+    /// - 拖拽：mousedown 落在顶栏条带内且非交互元素（磨砂条下滚过的卡片
+    ///   经 closest(INTERACTIVE) 放行，点卡片仍是点卡片）→ preventDefault +
+    ///   通知壳 performDrag——顶栏 frame 是 pointer-events:none，事件本就
+    ///   落在下层元素，故在 document 捕获层按几何判定
+    /// - 双击顶栏空白 → 窗口 zoom（macOS 标题栏惯例）
+    /// - 布局探针：load/resize 后量 .top-bar/.top-bar__frame/左槽首个交互
+    ///   元素矩形回传壳打日志——红绿灯让位用数据核验（traffic lights 占
+    ///   x∈[0,78] y∈[0,28]，须 leftInteractive.x ≥ 78 或不存在）
+    private static let chromeScript = """
+    (function () {
+      var INTERACTIVE = 'button, a, input, select, textarea, label, [role="button"]';
+      function strip() {
+        var bar = document.querySelector('.top-bar');
+        return bar ? bar.getBoundingClientRect() : null;
+      }
+      function inDragZone(event) {
+        var rect = strip();
+        if (!rect || event.clientY > rect.bottom) return false;
+        var node = event.target;
+        var element = node && node.closest ? node : (node ? node.parentElement : null);
+        return !(element && element.closest(INTERACTIVE));
+      }
+      document.addEventListener('mousedown', function (event) {
+        if (event.button === 0 && inDragZone(event)) {
+          event.preventDefault();
+          window.webkit.messageHandlers.shellChrome.postMessage('drag');
+        }
+      }, true);
+      document.addEventListener('dblclick', function (event) {
+        if (inDragZone(event)) {
+          window.webkit.messageHandlers.shellChrome.postMessage('zoom');
+        }
+      }, true);
+      function rounded(el) {
+        if (!el) return null;
+        var r = el.getBoundingClientRect();
+        return { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height) };
+      }
+      function probe() {
+        var bar = document.querySelector('.top-bar');
+        if (!bar) return;
+        var left = bar.querySelector('.top-bar__slot--left') || bar.querySelector('.top-bar__slot');
+        window.webkit.messageHandlers.shellChrome.postMessage({
+          kind: 'probe', path: location.hash,
+          bar: rounded(bar),
+          frame: rounded(bar.querySelector('.top-bar__frame')),
+          leftSlot: rounded(left),
+          leftInteractive: rounded(left && left.querySelector(INTERACTIVE))
+        });
+      }
+      window.addEventListener('load', function () {
+        setTimeout(probe, 800);
+        setTimeout(probe, 3000);
+      });
+      var resizeTimer = 0;
+      window.addEventListener('resize', function () {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(probe, 300);
+      });
+    })();
+    """
+
     private var window: NSWindow!
-    private var webView: WKWebView!
+    private var webView: ShellWebView!
     private let baseURL: URL
     private var activeDownloads: Set<WKDownload> = []
     private var loadRetries = 0
     private var hasCommittedOnce = false
+    /// 实际加载地址（WEIMO_MAC_START_URL 测试覆盖后的初始 URL）
+    private let initialURL: URL
+
+    /// 记录最近一次 mouseDown 供 performDrag 用（消息桥异步到达时
+    /// NSApp.currentEvent 可能已被 mouseMove 顶掉，取事件存根才稳）
+    private final class ShellWebView: WKWebView {
+        var lastMouseDown: NSEvent?
+        override func mouseDown(with event: NSEvent) {
+            lastMouseDown = event
+            super.mouseDown(with: event)
+        }
+    }
+
+    /// 测试钩子：WEIMO_MAC_START_URL 覆盖初始地址——完整 URL 原样用；以 #
+    /// 开头视为拼在本实例 baseURL 上的 hash（端到端探针直达 /#/movie 等
+    /// 深链，回环端口每次随机，写死端口必踩死链）
+    private static func startURL(default baseURL: URL) -> URL {
+        guard let raw = ProcessInfo.processInfo.environment["WEIMO_MAC_START_URL"] else {
+            return baseURL
+        }
+        if raw.hasPrefix("#"), let url = URL(string: baseURL.absoluteString + raw) {
+            return url
+        }
+        return URL(string: raw) ?? baseURL
+    }
 
     init(baseURL: URL) {
         self.baseURL = baseURL
+        self.initialURL = Self.startURL(default: baseURL)
         super.init()
 
         let contentRect = NSRect(x: 0, y: 0, width: 1280, height: 860)
@@ -52,6 +141,13 @@ final class MainWindowController: NSObject, NSWindowDelegate, WKNavigationDelega
             defer: false
         )
         window.title = "微墨·豆瓣"
+        // 标题栏一体化（路线图 3.1）：内容顶到窗口顶、系统标题栏透明隐藏，
+        // 红绿灯悬浮于 web 顶栏左侧空白带（窗口最小 960 恒 ≥700px 布局，
+        // 左槽 margin 推至 ~329px；欢迎页左槽壳内为空——零 CSS 让位，
+        // 探针日志核验）
+        window.styleMask.insert(.fullSizeContentView)
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
         window.minSize = NSSize(width: 960, height: 600)
         window.delegate = self
         // 原生窗口状态记忆：setFrameAutosaveName 存档有则自动恢复；无存档
@@ -77,12 +173,18 @@ final class MainWindowController: NSObject, NSWindowDelegate, WKNavigationDelega
             source: Self.contextMenuScript,
             injectionTime: .atDocumentStart,
             forMainFrameOnly: true))
+        userContentController.addUserScript(WKUserScript(
+            source: Self.chromeScript,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: true))
         // WKUserContentController 对 handler 强持有——弱代理切断
         // config→controller→self→webView 的经典保留环
         userContentController.add(
             WeakMessageProxy(target: self), name: "shellContextMenu")
+        userContentController.add(
+            WeakMessageProxy(target: self), name: "shellChrome")
 
-        webView = WKWebView(frame: window.contentView?.bounds ?? contentRect, configuration: configuration)
+        webView = ShellWebView(frame: window.contentView?.bounds ?? contentRect, configuration: configuration)
         webView.autoresizingMask = [.width, .height]
         webView.navigationDelegate = self
         webView.uiDelegate = self
@@ -92,7 +194,7 @@ final class MainWindowController: NSObject, NSWindowDelegate, WKNavigationDelega
     }
 
     private func load() {
-        webView.load(URLRequest(url: baseURL))
+        webView.load(URLRequest(url: initialURL))
     }
 
     func show() {
@@ -209,11 +311,36 @@ final class MainWindowController: NSObject, NSWindowDelegate, WKNavigationDelega
         _ userContentController: WKUserContentController,
         didReceive message: WKScriptMessage
     ) {
+        if message.name == "shellChrome" {
+            handleChromeMessage(message)
+            return
+        }
         guard message.name == "shellContextMenu",
               let body = message.body as? [String: Any],
               let url = body["url"] as? String, !url.isEmpty
         else { return }
         presentCardContextMenu(title: (body["title"] as? String) ?? "", url: url)
+    }
+
+    /// 标题栏一体化桥（3.1）：drag/zoom 动作 + 布局探针回传
+    private func handleChromeMessage(_ message: WKScriptMessage) {
+        if let action = message.body as? String {
+            switch action {
+            case "drag":
+                // mouseDown 存根（NSApp.currentEvent 可能已被后续事件顶掉）
+                if let event = webView.lastMouseDown, event.type == .leftMouseDown {
+                    window.performDrag(with: event)
+                }
+            case "zoom":
+                window.zoom(nil)
+            default:
+                break
+            }
+            return
+        }
+        if let probe = message.body as? [String: Any], probe["kind"] as? String == "probe" {
+            NSLog("[chrome] probe %@", String(describing: probe))
+        }
     }
 
     private func presentCardContextMenu(title: String, url: String) {
