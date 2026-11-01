@@ -115,7 +115,11 @@ export function IslandDemoLeading() {
 
   return (
     <FrostedLabel className="island-demo-leading" size="lg">
-      {demo.longTitle ? '影视/美国/科幻冒险/九十年代经典长片' : '岛对比'}
+      {/* 省略号须由文本自持：frosted-label 是 inline-flex 容器，
+          text-overflow 不作用于匿名 flex 文本项（实测省略号不渲染） */}
+      <span className="island-demo-leading__text">
+        {demo.longTitle ? '影视/美国/科幻冒险/九十年代经典长片' : '岛对比'}
+      </span>
     </FrostedLabel>
   )
 }

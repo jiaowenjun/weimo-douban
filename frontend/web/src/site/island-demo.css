@@ -68,8 +68,27 @@
    不动）；岛收起后标题延迟回弹——transition-delay 留足收拢退场
    （transform 260ms + 余量），否则标题在岛缩回途中弹回又撞一次。
    隐藏方向 delay 归零即时让位 */
+/* 长标题可收缩：frosted-label 自带 nowrap 且无溢出处理，作 flex 项
+   min-content=整串宽缩不动，左槽不够时挤压全落在侧边栏按钮上（按钮
+   被挤窄实测）——标签放开 min-width 让收缩、截尾省略号由内层文本
+   span 自持（flex 容器自身不渲染 text-overflow），按钮回自然宽 */
 .island-demo-leading {
+  min-width: 0;
   transition: opacity 240ms ease 320ms;
+}
+
+.island-demo-leading__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 触发钮零收缩：标签放开收缩只解决「谁 absorbs」，flex-shrink 仍按
+   基宽比例向全部 flex 项分摊压缩——圆钮 34→28 被挤成竖椭圆（实测
+   第二轮抓到）；flex: none 让它彻底退出分摊，空间不够全归标签截断 */
+#root[data-island-demo] .weimo-site-template__sidebar-trigger {
+  flex: none;
 }
 
 #root[data-island-demo='v1']:has(.top-bar-notice[data-visible='true']) .island-demo-leading {
