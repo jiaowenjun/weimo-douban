@@ -18,7 +18,7 @@ import './welcome-page.css'
  *  同步，URL 带具体版本 tag（Gitee 无 GitHub 的 latest 别名），APP_VERSION
  *  仍是版本号唯一改点；资产名是 release.sh 统一的 ASCII 前缀（gh 上传
  *  会剥掉 CJK 文件名） */
-const APP_VERSION = '0.5.2'
+const APP_VERSION = '0.5.3'
 /** 上面的发布日期（页脚展示）：= GitHub Release v{APP_VERSION} 的发布日
  *  （当天本地日期，YYYY-MM-DD），随版本 bump 同步改——部署规范要求
  *  txy 网页端页脚与最新 App Release 的版本号+发布日期一致（见 ops/

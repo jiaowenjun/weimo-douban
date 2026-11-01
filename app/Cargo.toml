@@ -1,6 +1,6 @@
 [package]
 name = "weimo-douban-app"
-version = "0.5.2"
+version = "0.5.3"
 edition = "2021"
 description = "微墨·豆瓣书影音 macOS 桌面 App（Tauri 壳 + 内嵌同步服务器）"
 
