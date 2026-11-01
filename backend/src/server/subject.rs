@@ -813,7 +813,7 @@ pub async fn requeue_jobs(state: &AppState, scope: &str, category: Option<&str>)
 // --------------------------------------------------------------------------- //
 
 /// subjects 行 → 对外 JSON（结构见方案 §7.1）
-fn subject_view(category: &str, subject_id: &str, r: &sqlx::sqlite::SqliteRow) -> Value {
+pub(super) fn subject_view(category: &str, subject_id: &str, r: &sqlx::sqlite::SqliteRow) -> Value {
     let meta_json: String = r.get("meta_json");
     let aka_json: String = r.get("aka_json");
     let fetched_ms: i64 = r.get("fetched_ms");
@@ -847,6 +847,14 @@ pub async fn get_subject_view(
     category: &str,
     subject_id: &str,
 ) -> AppResult<Value> {
+    get_subject_view_from_pool(&state.pool, category, subject_id).await
+}
+
+pub(super) async fn get_subject_view_from_pool(
+    pool: &SqlitePool,
+    category: &str,
+    subject_id: &str,
+) -> AppResult<Value> {
     if let Some(row) = sqlx::query(
         "SELECT title, original_title, year, aka_json, cover_url, rating_value,
                 rating_count, meta_json, status, fetched_ms, url, source
@@ -854,7 +862,7 @@ pub async fn get_subject_view(
     )
     .bind(category)
     .bind(subject_id)
-    .fetch_optional(&state.pool)
+    .fetch_optional(pool)
     .await?
     {
         return Ok(subject_view(category, subject_id, &row));
@@ -866,7 +874,7 @@ pub async fn get_subject_view(
     )
     .bind(category)
     .bind(subject_id)
-    .fetch_optional(&state.pool)
+    .fetch_optional(pool)
     .await?;
     if let Some(r) = record {
         let rec = crate::crawler::Record {
@@ -978,7 +986,7 @@ fn intro_fallback_row(record: &crate::crawler::Record) -> SubjectRow {
 
 /// intro 兜底视图：subjects 未富集时按 records.intro（Rust 移植解析器）合成，
 /// 形状与 rexxar 视图一致但无豆瓣评分、source="intro"（方案 §9 读侧兜底）。
-fn intro_fallback_view(record: &crate::crawler::Record) -> Value {
+pub(super) fn intro_fallback_view(record: &crate::crawler::Record) -> Value {
     let category = record.category.as_str();
     let (year, meta) = intro_fallback_parts(record);
     let mut view = json!({

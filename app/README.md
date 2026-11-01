@@ -1,5 +1,7 @@
 # 微墨·豆瓣桌面 App（Tauri，macOS / Windows）
 
+安装包同时附带 `weimo-douban-mcp`，由本地 Agent 按需启动，通过 stdio 只读查询应用数据库。它不随 GUI 启动、不运行同步任务；连接配置与工具说明见 [MCP 接入](../mcp/README.md)。构建钩子会先编译 MCP 再构建前端，`bundle.externalBin` 将对应平台的可执行文件加入安装包。
+
 方案 B 全栈封装：**Tauri 壳 + 内嵌同步服务器，单进程自足运行**。不依赖
 weimo.ink 也可工作。
 
@@ -105,7 +107,7 @@ CI 产物资产名全 ASCII（`weimo-douban` 前缀，与 mac 同约定——gh 
 | `SYNC_UPDATER_URL` | Gitee 优先+GitHub 回退 | 更新 manifest 端点覆盖（设为单端点；release 构建仅接受 https；本地联调需临时开 `dangerousInsecureTransportProtocol` 重新构建） |
 | `SYNC_SUBJECT_CACHE_URL` | 微墨中心 batch 接口 | 可选详情加速；空字符串禁用，故障自动回退本地豆瓣抓取。设置中的开关持久化在本地 SQLite |
 | `SYNC_UPDATE_AUTO` | 空 | `1` = 发现新版本不经确认直接装（无人值守） |
-| `SYNC_CRAWL_*` / `SYNC_SUBJECT_*` / `SYNC_DOUBAN_COOKIE` 等 | 后端默认 | 抓取/富集调参，语义与服务器部署一致（见根 README 参数表） |
+| `SYNC_CRAWL_*` / `SYNC_SUBJECT_*` / `SYNC_DOUBAN_COOKIE` 等 | 后端默认 | 抓取/富集调参，语义与服务器部署一致（见 [ServerConfig](../backend/src/server/config.rs)） |
 
 `bind`/`data_dir`/`token`/`cors_origins` 由 App 强制接管（回环、应用
 数据目录、免鉴权），环境变量不生效。

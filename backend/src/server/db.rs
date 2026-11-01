@@ -6,6 +6,42 @@ use sqlx::{
     SqlitePool,
 };
 
+/// Open an existing application database without bootstrap SQL or migrations.
+/// WAL/shm coordination may still use auxiliary files; application tables are read-only.
+pub async fn connect_read_only(db_path: &std::path::Path) -> Result<SqlitePool> {
+    anyhow::ensure!(
+        db_path.is_file(),
+        "数据库尚未初始化或路径错误：{}；请先在 App 中同步数据，或指定 --data-dir",
+        db_path.display()
+    );
+    let pool = SqlitePoolOptions::new()
+        .max_connections(2)
+        .acquire_timeout(std::time::Duration::from_secs(5))
+        .connect_with(
+            SqliteConnectOptions::new()
+                .filename(db_path)
+                .read_only(true)
+                .create_if_missing(false)
+                .busy_timeout(std::time::Duration::from_secs(2))
+                .pragma("query_only", "ON"),
+        )
+        .await
+        .context("打开只读数据库失败")?;
+    // Check the columns used by the reader, without attempting to upgrade an old DB.
+    for sql in [
+        "SELECT uid, username FROM users LIMIT 0",
+        "SELECT uid, category, dim_status, subject_id, title, alt_title, my_rating, date, comment, subject_url, cover, comment_id, intro FROM records LIMIT 0",
+        "SELECT uid, category, dim_status, state, fetched_ms FROM dimensions LIMIT 0",
+        "SELECT category, subject_id, title, original_title, year, aka_json, cover_url, rating_value, rating_count, meta_json, status, fetched_ms, url, source FROM subjects LIMIT 0",
+        "SELECT uid FROM subscriptions LIMIT 0",
+        "SELECT user FROM tasks LIMIT 0",
+    ] {
+        sqlx::query(sql).fetch_all(&pool).await
+            .context("数据库结构与 MCP 不兼容；请使用配套版本 App 打开数据库完成升级")?;
+    }
+    Ok(pool)
+}
+
 const BOOTSTRAP_SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS tasks (
   task_id     TEXT PRIMARY KEY,

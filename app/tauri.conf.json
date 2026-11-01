@@ -4,14 +4,15 @@
   "version": "0.5.1",
   "identifier": "ink.weimo.douban",
   "build": {
-    "beforeBuildCommand": "pnpm --dir ../frontend/web build",
-    "beforeDevCommand": "pnpm --dir ../frontend/web build"
+    "beforeBuildCommand": "node scripts/build-mcp.mjs && pnpm --dir ../frontend/web build",
+    "beforeDevCommand": "node scripts/build-mcp.mjs --debug && pnpm --dir ../frontend/web build"
   },
   "app": {
     "windows": []
   },
   "bundle": {
     "active": true,
+    "externalBin": ["binaries/weimo-douban-mcp"],
     "targets": [
       "app",
       "dmg",

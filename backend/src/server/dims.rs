@@ -74,7 +74,7 @@ async fn load_views(
 /// 不派生（decade、is_tv 中文化由前端做）、不清洗展示（空值原样，
 /// 前端自行跳过）。维度数组在视图的类别节点下（view[category]），
 /// year 在顶层（rexxar 与 intro 兜底两侧行状一致）。
-fn project_dims(category: Category, view: &Value) -> Value {
+pub(super) fn project_dims(category: Category, view: &Value) -> Value {
     let node = view.get(category.key()).cloned().unwrap_or(json!({}));
     let mut dims = Map::new();
     for key in [

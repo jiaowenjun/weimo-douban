@@ -42,7 +42,9 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: app
+          workspaces: |
+            app
+            mcp
 
       - name: 安装依赖（前端 + tauri CLI）
         run: |

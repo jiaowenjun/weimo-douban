@@ -1,5 +1,7 @@
 # 微墨·豆瓣 mac 原生壳（WeimoDoubanMac）
 
+构建脚本还会把独立的 `weimo-douban-mcp` 放入 `Contents/Resources`，供本地 Agent 用 stdio 只读查询共享数据库。运行该程序的 `--print-config` 可生成实际路径配置，详见 [MCP 接入](../mcp/README.md)。
+
 `app-mac/` 是《[tauri app mac 原生渐进式迁移路线图](../tauri_app_mac_原生渐进式迁移路线图.md)》
 的执行落地：**独立的 macOS 原生客户端**，与 `app/`（Tauri 版）并行存在、
 零改动后者（也不动 `backend/`、`frontend/`）。对应路线图终局 4B「换壳不

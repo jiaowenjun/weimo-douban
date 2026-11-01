@@ -8,6 +8,8 @@ pnpm --dir ../frontend/web build
 
 # 2) 无头服务器（release）
 cargo build --release --manifest-path server/Cargo.toml
+MCP_TARGET="$(rustc --print host-tuple)"
+cargo build --release --locked --manifest-path ../mcp/Cargo.toml --target "$MCP_TARGET"
 
 # 3) Swift 原生壳（release）
 swift build -c release
@@ -18,11 +20,13 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp .build/release/WeimoDoubanMac "$APP/Contents/MacOS/WeimoDoubanMac"
 cp server/target/release/weimo-douban-mac-server "$APP/Contents/Resources/weimo-douban-mac-server"
+cp "${CARGO_TARGET_DIR:-../mcp/target}/$MCP_TARGET/release/weimo-douban-mcp" "$APP/Contents/Resources/weimo-douban-mcp"
 cp icons/icon.icns "$APP/Contents/Resources/icon.icns"
 cp ../app/icons/tray-icon.png "$APP/Contents/Resources/tray-icon.png"
 cp Info.plist "$APP/Contents/Info.plist"
 
 # 5) ad-hoc 签名（本机自用；分发需 Developer ID 签名 + 公证，同 Tauri 版口径）
+codesign --force --sign - "$APP/Contents/Resources/weimo-douban-mcp"
 codesign --force --sign - "$APP"
 
 echo "✓ $APP"

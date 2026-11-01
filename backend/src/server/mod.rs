@@ -7,6 +7,7 @@ pub mod db;
 pub mod dims;
 pub mod error;
 pub mod fetcher;
+pub mod reader;
 pub mod routes;
 pub mod service;
 pub mod state;
