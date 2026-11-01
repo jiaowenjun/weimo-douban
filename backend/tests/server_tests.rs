@@ -1014,6 +1014,15 @@ async fn subject_dims_carries_my_rating_per_item() {
         ],
     )
     .await;
+    // m1 已富集（subjects 有 rexxar 行）、m2 走 intro 兜底：enriched
+    // 标记两态——前端侧边栏「已拉取详情 x/y」进度据此统计
+    sqlx::query(
+        "INSERT INTO subjects (category, subject_id, title, meta_json, source, status, fetched_ms)
+         VALUES ('movie', 'm1', 'T-m1', '{}', 'rexxar', 'ok', 0)",
+    )
+    .execute(&state.pool)
+    .await
+    .unwrap();
 
     let app = build_app(state);
     let (code, v) = request(
@@ -1029,8 +1038,10 @@ async fn subject_dims_carries_my_rating_per_item() {
     let items = v["items"].as_array().unwrap();
     assert_eq!(items[0]["id"], "m1");
     assert_eq!(items[0]["my_rating"], 5);
+    assert_eq!(items[0]["enriched"], true);
     assert_eq!(items[1]["id"], "m2");
     assert_eq!(items[1]["my_rating"], Value::Null);
+    assert_eq!(items[1]["enriched"], false);
 }
 
 // --------------------------------------------------------------------------- //

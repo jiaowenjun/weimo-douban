@@ -125,6 +125,25 @@ export function SiteSidebar({ onClose }: { onClose: () => void }) {
   const countsReady =
     uid === null || MARKS_CATEGORIES.every((c) => !dimsQueries[c].isPending)
 
+  // 富集进度「已拉取详情 x/y」：直接在 dims 投影上统计（enriched 随
+  // 投影下发）——富集逐条落库 bump subjects revision → dims 版本变 →
+  // pending 驱动的 3s 版本轮询让投影自动重拉，进度零额外请求实时刷
+  // 新；投影须全部条目带 enriched 字段才统计（旧后端/持久化缓存的旧
+  // 响应无字段——新旧混合期分子分母口径错位，宁可不显示，待投影整
+  // 体重拉自愈），全部就绪后进度语义完成即收起（与灵动岛完成收起同
+  // 哲学）
+  const enrichmentProgress = useMemo(() => {
+    const items = MARKS_CATEGORIES.flatMap((c) => dimsData[c]?.items ?? [])
+    if (
+      items.length === 0 ||
+      !items.every((item) => item.enriched !== undefined)
+    ) {
+      return null
+    }
+    const enriched = items.filter((item) => item.enriched).length
+    return enriched < items.length ? { enriched, total: items.length } : null
+  }, [dimsData])
+
   // 导航区节点：全部标记（书影音合并视图入口，图标对齐 biji-side-bar
   // 全部笔记的 Grid2X2；类别导航由筛选树一级根兼任，不在此重复），其
   // 下挂我的评分快捷筛选子节点（点击设 ?rating=，见 handleRatingSelect）。
@@ -266,7 +285,14 @@ export function SiteSidebar({ onClose }: { onClose: () => void }) {
   )
   const facetSection = (
     <section aria-label="分面筛选" className="site-sidebar__facet">
-      <div className="site-sidebar__section-hint">分类筛选</div>
+      <div className="site-sidebar__section-hint">
+        <span>分类筛选</span>
+        {enrichmentProgress ? (
+          <span className="site-sidebar__enrich-progress">
+            {`已拉取详情 ${enrichmentProgress.enriched}/${enrichmentProgress.total}`}
+          </span>
+        ) : null}
+      </div>
       {facetBody}
     </section>
   )

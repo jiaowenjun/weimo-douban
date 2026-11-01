@@ -123,6 +123,11 @@ pub async fn subject_dims(
                 // 标记级字段（用户自己的评分，非条目维度）：前端「全部
                 // 标记」导航子节点按它计数，随维度投影一并下发
                 "my_rating": record.my_rating,
+                // 富集就绪标记（source=rexxar；intro 兜底未就绪）：前端
+                // 侧边栏「已拉取详情 x/y」进度在投影上统计——富集逐条
+                // 落库 bump subjects revision → dims 版本变 → 投影重拉，
+                // 进度随既有版本流自动更新，零额外请求
+                "enriched": view.get("source") == Some(&json!("rexxar")),
                 "dims": project_dims(category, view),
             })
         })

@@ -252,6 +252,9 @@ export type DoubanDimsItem = {
   /** 我的评分 1-5 星（标记级字段平铺在 item 顶层，未评为 null；旧版
    *  响应无此字段）——「全部标记」导航子节点按它跨类别计数 */
   my_rating?: number | null
+  /** 富集就绪（source=rexxar；intro 兜底 false；旧后端无此字段）——
+   *  侧边栏「已拉取详情 x/y」进度在投影上统计，随版本流自动刷新 */
+  enriched?: boolean
   dims: {
     year?: number
     is_tv?: boolean

@@ -35,12 +35,21 @@
   padding-top: 18px;
 }
 
-/* 分面筛选区小节提示，对齐 biji-side-bar__section-hint */
+/* 分面筛选区小节提示，对齐 biji-side-bar__section-hint；行右端挂富集
+   进度（已拉取详情 x/y，随 dims 投影自动刷新，全部就绪即收起） */
 .site-sidebar__section-hint {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
   padding-block: 18px 6px;
   color: var(--color-text-placeholder);
   font-size: 13px;
   line-height: 1.2;
+}
+
+.site-sidebar__enrich-progress {
+  white-space: nowrap;
 }
 
 /* 筛选区加载占位行：节奏对齐统计区的 sidebar-stats__status
