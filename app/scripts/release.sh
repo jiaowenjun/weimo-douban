@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 发布桌面 App：构建（含 updater 签名产物）→ 拉取 Windows CI 产物 →
+# 发布桌面 App：构建（含 updater 签名产物 + dmg 后处理）→ 拉取 Windows CI 产物 →
 # 生成 latest.json → gh release 上传 → 同步 Gitee 国内镜像（源码双推 +
 # 发行版附件 + app-latest 更新清单分支，大陆免梯下载/更新）。已装旧版的
 # App 经启动自检/托盘「检查更新」自动升级（默认端点 Gitee 优先+GitHub
@@ -139,6 +139,72 @@ if [ "${1:-}" = "--gitee-only" ]; then
   exit 0
 fi
 
+# ---- dmg 后处理：修复安装窗口多出的 .VolumeIcon.icns 图标 ----
+# tauri-bundler 生成的 bundle_dmg.sh 把 App 图标拷进卷根当卷图标，但只
+# SetFile -c icnC 不设 hidden 标志，且「隐藏文件挪出可视区」的兜底仅在配
+# 背景图时注入（本应用未配）——构建机 Finder 排版时给它写了 .DS_Store 的
+# Iloc 位置记录，新 macOS Finder 对带显式位置记录的条目即使 dot 前缀
+# +hidden 标志也照样渲染 → 安装窗口左上角多出一个半透明墨滴图标
+# （2026-11-01 实测定论，v0.5.1 起即有）。修复双管齐下缺一不可（只补标志
+# 实测仍显示）：chflags hidden + 经 Finder 把 Iloc 挪到 {5000,5000} 出屏；
+# UDRW 挂载改写后按上游同款 zlib-level=9 压回，App 内容零改动（逐文件
+# diff 已验证）。任何一步校验失败即中止发布，不带病出包。
+fix_dmg_volume_icon() { # $1=dmg 路径（就地修复）
+  local dmg="$1" rw mnt vmnt n
+  rw="${dmg%.dmg}.volicon-rw.dmg"
+  mnt="$(mktemp -d "${TMPDIR:-/tmp}/volicon-fix.XXXXXX")"
+  hdiutil convert "$dmg" -format UDRW -o "$rw" -ov -quiet
+  hdiutil attach "$rw" -mountpoint "$mnt" -nobrowse -quiet
+  if [ -e "$mnt/.VolumeIcon.icns" ]; then
+    chflags hidden "$mnt/.VolumeIcon.icns"
+    osascript <<APPLESCRIPT
+tell application "Finder"
+  tell (folder (POSIX file "$mnt" as alias))
+    open
+    tell container window to set position of item ".VolumeIcon.icns" to {5000, 5000}
+    close
+  end tell
+end tell
+APPLESCRIPT
+  else
+    echo "  · 卷根无 .VolumeIcon.icns（上游 bundler 已修？），跳过"
+  fi
+  # 卷可能被系统提前卸载（mountpoint 已消失视为已卸）；仍在则重试卸载。
+  # 注意不用 grep -q：命中即提前退出会让 hdiutil 吃 SIGPIPE，pipefail 下
+  # 整条管道判假（实测害跳过卸载、rw 镜像挂着 convert 忙死）
+  if hdiutil info | grep -F "$rw" >/dev/null; then
+    n=0
+    until hdiutil detach "$mnt" -quiet 2>/dev/null; do
+      n=$((n + 1))
+      [ $n -ge 5 ] && { echo "  !! dmg 后处理：卷卸载失败 $mnt"; return 1; }
+      sleep 2
+    done
+  fi
+  hdiutil convert "$rw" -format UDZO -imagekey zlib-level=9 -o "$dmg" -ov -quiet
+  rm -f "$rw"
+  # 回读校验：标志位与出屏 Iloc 双确认，防「静默未生效」出包
+  vmnt="$(mktemp -d "${TMPDIR:-/tmp}/volicon-verify.XXXXXX")"
+  hdiutil attach "$dmg" -mountpoint "$vmnt" -nobrowse -quiet
+  if [ -e "$vmnt/.VolumeIcon.icns" ]; then
+    ls -lO "$vmnt/.VolumeIcon.icns" | grep -w hidden >/dev/null \
+      || { echo "  !! dmg 后处理：hidden 标志未生效"; return 1; }
+    if ! python3 - "$vmnt/.DS_Store" <<'PYEOF'
+import sys
+data = open(sys.argv[1], 'rb').read()
+i = data.find('.VolumeIcon.icns'.encode('utf-16-be'))
+ok = i >= 0 and b'Iloc' in data[i:i+96] and b'\x00\x00\x13\x88\x00\x00\x13\x88' in data[i:i+96]
+sys.exit(0 if ok else 1)
+PYEOF
+    then
+      echo "  !! dmg 后处理：.VolumeIcon.icns 位置未挪出屏（Iloc 校验失败）"
+      return 1
+    fi
+  fi
+  hdiutil detach "$vmnt" -quiet 2>/dev/null || true
+  rmdir "$mnt" "$vmnt" 2>/dev/null || true
+  echo "  · .VolumeIcon.icns 已隐藏并挪出安装窗口（hidden 标志+出屏 Iloc）"
+}
+
 : "${TAURI_SIGNING_PRIVATE_KEY:?需要设置 TAURI_SIGNING_PRIVATE_KEY（私钥路径或内容），密钥丢失将无法推送更新}"
 BUNDLE=target/release/bundle
 # 本地产物名随 productName（微墨·豆瓣，含 CJK）；上传前统一复制为 ASCII 名——
@@ -151,6 +217,9 @@ TGZ_ASCII="$BUNDLE/macos/weimo-douban.app.tar.gz"
 
 echo "==> 构建 v$VERSION"
 pnpm tauri build
+
+echo "==> dmg 后处理：修复安装窗口 .VolumeIcon.icns 曝光"
+fix_dmg_volume_icon "$BUNDLE/dmg/微墨·豆瓣_${VERSION}_aarch64.dmg"
 
 echo "==> 复制产物为 ASCII 资产名"
 cp "$BUNDLE/dmg/微墨·豆瓣_${VERSION}_aarch64.dmg" "$DMG_ASCII"
