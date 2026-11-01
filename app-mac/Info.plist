@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- 微墨·豆瓣 mac 原生壳 bundle 描述（scripts/build-app.sh 组装时拷入）。
+	     bundle id 加 .native 后缀与 Tauri 版（ink.weimo.douban）区分，两版
+	     可共存；数据目录仍是同一个（壳经 --data-dir 显式传入）。 -->
+	<key>CFBundleDevelopmentRegion</key>
+	<string>zh_CN</string>
+	<key>CFBundleExecutable</key>
+	<string>WeimoDoubanMac</string>
+	<key>CFBundleIconFile</key>
+	<string>icon.icns</string>
+	<key>CFBundleIdentifier</key>
+	<string>ink.weimo.douban.native</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>微墨·豆瓣原生</string>
+	<key>CFBundleDisplayName</key>
+	<string>微墨·豆瓣原生</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>13.0</string>
+	<!-- 菜单栏常驻形态：无 Dock 图标的 accessory app，托盘见（与 Tauri 版同形态） -->
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<!-- 内嵌服务走 http://127.0.0.1（ATS 对回环默认豁免，此处双保险） -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+</dict>
+</plist>

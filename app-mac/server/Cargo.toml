@@ -1,0 +1,16 @@
+[package]
+name = "weimo-douban-mac-server"
+version = "0.1.0"
+edition = "2021"
+description = "微墨·豆瓣 mac 原生壳的无头内嵌服务器（API + /douban/ 静态，由 WeimoDoubanMac sidecar 拉起）"
+
+[dependencies]
+weimo-douban = { path = "../../backend" }
+anyhow = "1"
+axum = "0.8"
+clap = { version = "4", features = ["derive"] }
+libc = "0.2"
+mime_guess = "2"
+rust-embed = { version = "8", features = ["debug-embed"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "time"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }

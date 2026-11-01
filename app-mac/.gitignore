@@ -1,0 +1,4 @@
+/server/target/
+/.build/
+/build/
+.DS_Store

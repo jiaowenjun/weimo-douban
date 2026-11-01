@@ -1,0 +1,225 @@
+import AppKit
+
+/// 原生壳总控：托盘（NSStatusItem + 菜单）、sidecar 生命周期、窗口创建、
+/// 单实例与 Tauri 版共存警告、同步监控接线。对应 Tauri 版 main.rs 的壳职责
+/// （端口绑定/窗口/托盘/更新/单实例），原生重写。
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate {
+
+    private var statusItem: NSStatusItem?
+    private let sidecar = SidecarServer()
+    private var windowController: MainWindowController?
+    private var syncMonitor: SyncMonitor?
+
+    // 托盘菜单项引用（状态行文本刷新 / 立即同步禁用态 / 自启开关态）
+    private var statusLineItem: NSMenuItem?
+    private var syncNowItem: NSMenuItem?
+    private var launchAtLoginItem: NSMenuItem?
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        guard handleSingleInstance() else { NSApp.terminate(nil); return }
+
+        Notifier.shared.setup()
+        Notifier.shared.onActivate = { [weak self] in self?.showMainWindow() }
+
+        // 二次启动的唤起信号（单实例分支在退出前投递）
+        DistributedNotificationCenter.default().addObserver(
+            self, selector: #selector(showMainWindow),
+            name: Notification.Name("WeimoDoubanNativeShowWindow"), object: nil)
+
+        warnIfTauriRunning()
+        buildStatusItem()
+
+        sidecar.onReady = { [weak self] baseURL in
+            self?.serverReady(baseURL: baseURL)
+        }
+        sidecar.onUnexpectedExit = { status in
+            self.fatalAlert("本地服务异常退出（status \(status)），App 即将退出。可尝试重新启动。")
+        }
+        do {
+            try sidecar.start(binary: serverBinary(), dataDir: ShellSupport.dataDir)
+        } catch {
+            fatalAlert("本地服务启动失败：\(error.localizedDescription)")
+        }
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        sidecar.shutdown()
+    }
+
+    func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
+        true
+    }
+
+    // MARK: - 启动装配
+
+    /// 服务就绪 → 建窗 + 起监控（服务未就绪前开窗只会砸在空端口上）
+    private func serverReady(baseURL: URL) {
+        let controller = MainWindowController(baseURL: baseURL)
+        windowController = controller
+        controller.show()
+
+        let monitor = SyncMonitor(baseURL: baseURL)
+        monitor.onStatusLine = { [weak self] line in
+            self?.statusLineItem?.title = "状态：\(line)"
+            self?.syncNowItem?.isEnabled = !line.hasPrefix("同步中")
+        }
+        monitor.onNotify = { title, body in
+            Notifier.shared.post(title: title, body: body)
+        }
+        syncMonitor = monitor
+        monitor.start()
+    }
+
+    /// sidecar 二进制定位：dev 走 WEIMO_MAC_SERVER_BIN（dev.sh 注入），
+    /// bundle 内取 Resources；都未命中给一个相对路径让 start() 报可读错误
+    private func serverBinary() -> URL {
+        if let path = ProcessInfo.processInfo.environment["WEIMO_MAC_SERVER_BIN"] {
+            return URL(fileURLWithPath: path)
+        }
+        return Bundle.main.url(forResource: "weimo-douban-mac-server", withExtension: nil)
+            ?? URL(fileURLWithPath: "weimo-douban-mac-server")
+    }
+
+    /// 单实例：bundle 运行时按 bundle id 判重（防双进程写同一 SQLite），
+    /// 二次启动唤醒既有实例窗口后自退；dev 直跑（无 bundle id）不判重
+    private func handleSingleInstance() -> Bool {
+        guard let bundleId = Bundle.main.bundleIdentifier else { return true }
+        let others = NSRunningApplication.runningApplications(withBundleIdentifier: bundleId)
+            .filter { $0.processIdentifier != ProcessInfo.processInfo.processIdentifier }
+        guard let existing = others.first else { return true }
+        DistributedNotificationCenter.default().postNotificationName(
+            Notification.Name("WeimoDoubanNativeShowWindow"), object: nil, deliverImmediately: true)
+        existing.activate()
+        return false
+    }
+
+    /// 与 Tauri 版共存警告：两版共用同一 SQLite（未开 WAL、busy_timeout 仅
+    /// sqlx 默认 5s），双进程同时写有 SQLITE_BUSY 风险——告知后由用户定夺
+    private func warnIfTauriRunning() {
+        let tauriRunning = !NSRunningApplication.runningApplications(
+            withBundleIdentifier: ShellSupport.tauriBundleIdentifier).isEmpty
+        guard tauriRunning else { return }
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "检测到 Tauri 版微墨·豆瓣正在运行"
+        alert.informativeText = "两版共用同一数据库，同时运行可能产生写冲突（未开 WAL）。\n建议先退出其中一版再继续。"
+        alert.addButton(withTitle: "仍要运行")
+        alert.addButton(withTitle: "退出")
+        NSApp.activate(ignoringOtherApps: true)
+        if alert.runModal() == .alertSecondButtonReturn {
+            NSApp.terminate(nil)
+        }
+    }
+
+    // MARK: - 托盘
+
+    private func buildStatusItem() {
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        // SF Symbol 模板图标：自动适配菜单栏明暗（与站点「影视」类别图标同语义）
+        item.button?.image = NSImage(systemSymbolName: "clapperboard", accessibilityDescription: "微墨·豆瓣")
+
+        let menu = NSMenu()
+
+        let open = NSMenuItem(title: "打开主窗口", action: #selector(showMainWindow), keyEquivalent: "o")
+        open.target = self
+        open.keyEquivalentModifierMask = .command
+        menu.addItem(open)
+
+        let statusLine = NSMenuItem(title: "状态：启动中…", action: nil, keyEquivalent: "")
+        statusLine.isEnabled = false
+        menu.addItem(statusLine)
+        statusLineItem = statusLine
+
+        let syncNow = NSMenuItem(title: "立即同步", action: #selector(syncNowTapped), keyEquivalent: "s")
+        syncNow.target = self
+        syncNow.keyEquivalentModifierMask = .command
+        menu.addItem(syncNow)
+        syncNowItem = syncNow
+
+        let openData = NSMenuItem(title: "打开数据文件夹", action: #selector(openDataFolderTapped), keyEquivalent: "")
+        openData.target = self
+        menu.addItem(openData)
+
+        menu.addItem(.separator())
+
+        let launch = NSMenuItem(title: "开机自动启动", action: #selector(toggleLaunchAtLoginTapped), keyEquivalent: "")
+        launch.target = self
+        launch.state = ShellSupport.launchAtLoginEnabled ? .on : .off
+        menu.addItem(launch)
+        launchAtLoginItem = launch
+
+        let github = NSMenuItem(title: "GitHub 仓库", action: #selector(openGitHubTapped), keyEquivalent: "")
+        github.target = self
+        menu.addItem(github)
+
+        menu.addItem(.separator())
+
+        let quit = NSMenuItem(title: "退出微墨·豆瓣", action: #selector(quitTapped), keyEquivalent: "q")
+        quit.target = self
+        quit.keyEquivalentModifierMask = .command
+        menu.addItem(quit)
+
+        item.menu = menu
+        statusItem = item
+    }
+
+    // MARK: - 菜单动作
+
+    @objc func showMainWindow() {
+        // 服务未就绪时窗口尚未创建（就绪即自动弹出，此处无操作）
+        windowController?.show()
+    }
+
+    @objc private func syncNowTapped() {
+        guard let monitor = syncMonitor else { return }
+        syncNowItem?.isEnabled = false
+        syncNowItem?.title = "同步请求中…"
+        Task {
+            if let message = await monitor.triggerSyncAll() {
+                alert(message)
+            }
+            syncNowItem?.isEnabled = true
+            syncNowItem?.title = "立即同步"
+        }
+    }
+
+    @objc private func openDataFolderTapped() {
+        ShellSupport.revealDataDir()
+    }
+
+    @objc private func toggleLaunchAtLoginTapped() {
+        let target = !ShellSupport.launchAtLoginEnabled
+        if ShellSupport.setLaunchAtLogin(target) {
+            launchAtLoginItem?.state = target ? .on : .off
+        }
+    }
+
+    @objc private func openGitHubTapped() {
+        ShellSupport.openExternal(ShellSupport.repositoryURL)
+    }
+
+    @objc private func quitTapped() {
+        NSApp.terminate(nil)
+    }
+
+    // MARK: - 弹窗
+
+    private func alert(_ message: String) {
+        let alert = NSAlert()
+        alert.messageText = message
+        alert.addButton(withTitle: "好")
+        NSApp.activate(ignoringOtherApps: true)
+        alert.runModal()
+    }
+
+    private func fatalAlert(_ message: String) {
+        let alert = NSAlert()
+        alert.alertStyle = .critical
+        alert.messageText = message
+        alert.addButton(withTitle: "退出")
+        NSApp.activate(ignoringOtherApps: true)
+        alert.runModal()
+        NSApp.terminate(nil)
+    }
+}
