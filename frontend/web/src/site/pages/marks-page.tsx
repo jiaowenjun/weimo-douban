@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { Navigate, useParams, useSearchParams } from 'react-router'
 
 import { TextButton } from 'weimo-ui-core/components/text-button'
+import { useInfiniteListSentinel } from 'weimo-ui-core/lib/use-infinite-list-sentinel'
 
 import { DoubanDataQueryError } from '../api'
 import { useDoubanUser } from '../douban-user'
@@ -12,6 +13,7 @@ import { useMarksList } from '../use-marks-list'
 import { filterIds } from '../facet-engine'
 import { facetPathKey, facetValueLabel, parseFacetPath } from '../facet-model'
 import { MarkCard } from '../mark-card'
+import { MARKS_PAGE_SIZE } from '../marks-list'
 import {
   CATEGORY_PAST_VERBS,
   CATEGORY_UNIT_NOUNS,
@@ -25,6 +27,20 @@ import './marks-page.css'
 /** RFC3339 → YYYY-MM-DD（cached_at 只取日期粒度即可） */
 function formatDate(iso: string): string {
   return iso ? iso.slice(0, 10) : ''
+}
+
+/** Only mounted while paging is allowed and no error needs an explicit retry. */
+function LoadMoreSentinel({ loading, onLoadMore }: {
+  loading: boolean
+  onLoadMore: () => void
+}) {
+  const ref = useInfiniteListSentinel({
+    hasNextPage: true,
+    isFetchNextPageError: false,
+    isFetchingNextPage: loading,
+    onLoadMore,
+  })
+  return <div aria-hidden="true" className="marks-page__sentinel" ref={ref} />
 }
 
 /** 标记列表页：读登录用户的缓存标记（GET /users/{uid}/marks），只读不触发抓取。
@@ -171,7 +187,7 @@ export function MarksPage() {
       </div>
     )
   } else {
-    const hasMore = state.items.length < state.total
+    const hasMore = state.loadedPages * MARKS_PAGE_SIZE < state.total
     const syncedDate = formatDate(state.cachedAt)
     // meta 行名词：三类别统一量词名词（…部影视/…本书/…张专辑）；
     // all 合并视图为「已标记 N 条书影音」，评分筛选时后缀追加
@@ -196,22 +212,38 @@ export function MarksPage() {
             <MarkCard key={mark.comment_id || mark.subject_id} mark={mark} />
           ))}
         </ul>
-        {hasMore || state.error ? (
-          <div className="marks-page__more">
-            {state.error ? (
-              <span className="marks-page__more-error">
-                {state.error}
-              </span>
+        {state.total > 0 || state.error || list.refreshing ? (
+          <div className="marks-page__more" role="status">
+            {list.canLoadMore && !state.error ? (
+              // Cached pages can append synchronously, skipping a rendered loading
+              // state. Remount only the sentinel so a still-visible end is observed
+              // again, without resetting cards or the manual button's focus.
+              <LoadMoreSentinel
+                key={list.loadedPages}
+                loading={list.loadingMore}
+                onLoadMore={list.loadMore}
+              />
             ) : null}
-            <TextButton
-              disabled={!state.error && (list.loadingMore || !list.canLoadMore)}
-              onClick={state.error ? retry : list.loadMore}
-              type="button"
-            >
-              {!state.error && list.loadingMore
-                ? '加载中…'
-                : state.error ? '重试' : `加载更多（${state.items.length}/${state.total}）`}
-            </TextButton>
+            {state.error ? (
+              <>
+                <span className="marks-page__more-error">{state.error}</span>
+                <TextButton onClick={retry} type="button">重试</TextButton>
+              </>
+            ) : list.refreshing && !list.canLoadMore && !list.loadingMore ? (
+              <span>正在更新标记…</span>
+            ) : hasMore || list.loadingMore ? (
+              <TextButton
+                disabled={list.loadingMore || !list.canLoadMore}
+                onClick={list.loadMore}
+                type="button"
+              >
+                {list.loadingMore
+                  ? '正在加载更多…'
+                  : `加载更多（${state.items.length}/${state.total}）`}
+              </TextButton>
+            ) : state.total > 0 ? (
+              <span>已加载全部标记（{state.items.length}）</span>
+            ) : null}
           </div>
         ) : null}
       </>

@@ -46,10 +46,23 @@
 /* ------------------------------------------------------------------ */
 
 .marks-page__more {
+  position: relative;
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   align-items: center;
   justify-content: center;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+  text-align: center;
+}
+
+.marks-page__sentinel {
+  position: absolute;
+  top: 0;
+  width: 100%;
+  height: 1px;
+  pointer-events: none;
 }
 
 .marks-page__more-error {
