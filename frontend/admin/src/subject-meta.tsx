@@ -174,8 +174,18 @@ export function SubjectNotEnriched({
   );
 }
 
-/** 封面图（走本地 covers 代理，含 token 兜底） */
+/** 封面图（走本地 covers 代理，含 token 兜底）；无封面（豆瓣兜底图
+ *  在后端归一后的空串）渲染中性占位块，避免 <img src=""> 裂图 */
 export function SubjectCover({ subject, size = 44 }: { subject: Subject; size?: number }) {
+  if (!subject.cover) {
+    return (
+      <div
+        aria-label={`${subject.title} 无封面`}
+        role="img"
+        style={{ width: size, height: size * 1.4, borderRadius: 4, background: '#f5f5f5' }}
+      />
+    );
+  }
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img

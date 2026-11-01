@@ -217,7 +217,9 @@ export default function Marks() {
             title: '',
             dataIndex: 'cover',
             width: 56,
-            render: (v) => <Avatar shape="square" size={44} src={resolveApiUrl(v)} />,
+            // 无封面（空串）传 undefined 让 antd Avatar 直接渲染默认图标——
+            // 空串 src 部分浏览器不发 error 事件、不触发图标回退
+            render: (v) => <Avatar shape="square" size={44} src={v ? resolveApiUrl(v) : undefined} />,
           },
           {
             title: '条目',

@@ -116,9 +116,10 @@ const COVER_RETRY_DELAYS_MS = [500, 1500]
 /** 封面图（含失败恢复）：加载失败自动限次延迟重试——重试请求在代理
  *  URL 外层追加 _r=N 显式改变资源地址，不依赖浏览器对相同 src 重新渲染
  *  的处理（_r 不动 u 与鉴权参数，后端 covers 端点忽略未知参数）；重试
- *  耗尽切换占位骨架与手动重试按钮。调用处以 key=cover 挂载，封面源
+ *  耗尽切换占位骨架与手动重试按钮，占位底色按类别分色（与无封面态
+ *  同款，见 mark-card.css --empty）。调用处以 key=cover 挂载，封面源
  *  变化即整体重挂载重置；卸载清理挂起的重试定时器 */
-function MarkCover({ cover, title }: { cover: string; title: string }) {
+function MarkCover({ category, cover, title }: { category: string; cover: string; title: string }) {
   const [attempt, setAttempt] = useState(0)
   const [failed, setFailed] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
@@ -141,6 +142,7 @@ function MarkCover({ cover, title }: { cover: string; title: string }) {
       <div
         aria-label={`${title} 封面未能加载`}
         className="mark-card__cover mark-card__cover--empty mark-card__cover--failed"
+        data-category={category}
         role="group"
       >
         <span
@@ -425,9 +427,9 @@ export function MarkCard({ mark }: MarkCardProps) {
         <div className="mark-card__meta-region" data-expanded={metaExpanded ? 'true' : 'false'}>
           <div className="mark-card__subject">
             {cover ? (
-              <MarkCover cover={cover} key={cover} title={mark.title} />
+              <MarkCover category={mark.category} cover={cover} key={cover} title={mark.title} />
             ) : (
-              <div className="mark-card__cover mark-card__cover--empty" />
+              <div className="mark-card__cover mark-card__cover--empty" data-category={mark.category} />
             )}
             <div className="mark-card__info">
               {renderTitleRow('inline')}

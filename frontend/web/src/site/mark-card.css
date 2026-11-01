@@ -95,8 +95,37 @@
   background: var(--color-bg-raised);
 }
 
+/* 无封面/封面加载失败的占位区：虚线边框 + 类别分色单色底（亮暗双态）。
+   色相约定：影视=蓝（银幕）、书=绿（纸墨）、音乐=紫（律动）；亮度层级
+   与卡片 raised 底一致（亮 92-93% / 暗 16-17%）、低饱和——读作有意的
+   占位而非加载失败。未匹配类别（无 data-category）回落中性 raised 底 */
 .mark-card__cover--empty {
-  border: 1px dashed var(--color-border);
+  border: 1px dashed var(--color-border-emphasis);
+  background: var(--color-bg-raised);
+}
+
+.mark-card__cover--empty[data-category='movie'] {
+  background: hsl(214 26% 92%);
+}
+
+.mark-card__cover--empty[data-category='book'] {
+  background: hsl(150 22% 92%);
+}
+
+.mark-card__cover--empty[data-category='music'] {
+  background: hsl(292 24% 93%);
+}
+
+.dark .mark-card__cover--empty[data-category='movie'] {
+  background: hsl(214 16% 17%);
+}
+
+.dark .mark-card__cover--empty[data-category='book'] {
+  background: hsl(150 14% 16%);
+}
+
+.dark .mark-card__cover--empty[data-category='music'] {
+  background: hsl(292 14% 17%);
 }
 
 /* 封面重试耗尽：空占位骨架上居中一个手动重试按钮 */

@@ -381,10 +381,24 @@ async fn read_nonempty(path: &Path) -> Option<Vec<u8>> {
     (!bytes.is_empty()).then_some(bytes)
 }
 
-/// 把库里的豆瓣封面 URL 改写为本地代理端点（空值原样返回）。
+/// 豆瓣「无封面」兜底图判定：收藏页对无封面条目返回 asset.doubanio.com
+/// 上的静态占位图（现知 4 种：book-default-lpic.gif / movie_default_small.png /
+/// tv_default_small.png / music-default-lpic.*.gif），真实封面与头像都在
+/// img*.doubanio.com。按 host 精确匹配——封面位出现该域即兜底图，天然覆盖
+/// 未来新增变体；不放宽到任意 doubanio 域，避免误吞未来真实封面域。
+fn is_douban_default_cover(url: &str) -> bool {
+    url::Url::parse(url)
+        .ok()
+        .and_then(|u| u.host_str().map(|h| h == "asset.doubanio.com"))
+        .unwrap_or(false)
+}
+
+/// 把库里的豆瓣封面 URL 改写为本地代理端点；空值原样返回，豆瓣无封面
+/// 兜底图归一为空串（前端按无封面渲染 CSS 占位区，不代理豆瓣占位图——
+/// 其路径 /cuphead/ 不在白名单，代理只会确定性 400）。
 /// 相对路径，前端经自身反向代理（dev 下 vite proxy）转发到本服务。
 pub fn cover_proxy_url(cover: &str) -> String {
-    if cover.is_empty() {
+    if cover.is_empty() || is_douban_default_cover(cover) {
         return String::new();
     }
     format!("/api/v1/covers?u={}", encode_query_component(cover))
@@ -465,6 +479,25 @@ mod tests {
             "/api/v1/covers?u=https%3A%2F%2Fimg3.doubanio.com%2Fview%2Fphoto%2Fs%2Fpublic%2Fp1.webp"
         );
         assert_eq!(encode_query_component("aZ09-._~"), "aZ09-._~");
+    }
+
+    #[test]
+    fn proxy_url_empty_for_douban_default_covers() {
+        // 豆瓣无封面兜底图（asset.doubanio.com 静态资源域，线上实测 4 种形态）
+        // 归一为空串，前端按无封面渲染 CSS 占位区
+        for u in [
+            "https://asset.doubanio.com/cuphead/book-static/pics/book-default-lpic.gif",
+            "https://asset.doubanio.com/cuphead/movie-static/pics/movie_default_small.png",
+            "https://asset.doubanio.com/cuphead/movie-static/pics/tv_default_small.png",
+            "https://asset.doubanio.com/cuphead/vendors/pics/music-default-lpic.eac158170058.gif",
+        ] {
+            assert_eq!(cover_proxy_url(u), "", "兜底图应归一为空: {u}");
+        }
+        // 真实封面与头像（img*.doubanio.com）不受影响
+        assert!(cover_proxy_url("https://img2.doubanio.com/view/subject/s/public/s27018761.jpg")
+            .starts_with("/api/v1/covers?u="));
+        assert!(cover_proxy_url("https://img9.doubanio.com/icon/u145680993-334.webp")
+            .starts_with("/api/v1/covers?u="));
     }
 
     fn status_failure(code: u16, retry_after: Option<Duration>) -> FetchFailure {
