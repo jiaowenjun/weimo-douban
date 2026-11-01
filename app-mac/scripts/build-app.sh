@@ -19,6 +19,7 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp .build/release/WeimoDoubanMac "$APP/Contents/MacOS/WeimoDoubanMac"
 cp server/target/release/weimo-douban-mac-server "$APP/Contents/Resources/weimo-douban-mac-server"
 cp ../app/icons/icon.icns "$APP/Contents/Resources/icon.icns"
+cp ../app/icons/tray-icon.png "$APP/Contents/Resources/tray-icon.png"
 cp Info.plist "$APP/Contents/Info.plist"
 
 # 5) ad-hoc 签名（本机自用；分发需 Developer ID 签名 + 公证，同 Tauri 版口径）

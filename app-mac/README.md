@@ -10,7 +10,7 @@
 ```
 WeimoDoubanNative.app（单进程 + sidecar）
 ├─ Swift 原生壳（AppKit，LSUIElement 托盘常驻，SPM 零第三方依赖）
-│   ├─ NSStatusItem + 菜单（SF Symbol clapperboard 模板图标）
+│   ├─ NSStatusItem + 菜单（白墨滴模板图标=与 Tauri 版统一，isTemplate 自适配明暗；symbol 回退链兜底）
 │   ├─ NSWindow + WKWebView ← 加载 http://127.0.0.1:<port>/douban/
 │   └─ SyncMonitor：3s 轮询 localhost API → 状态行 + 系统通知
 └─ weimo-douban-mac-server（Rust sidecar，链 ../backend lib）

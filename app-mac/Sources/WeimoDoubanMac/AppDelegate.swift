@@ -16,6 +16,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var syncNowItem: NSMenuItem?
     private var launchAtLoginItem: NSMenuItem?
 
+    /// 进程存活期的强引用兜底：NSApplication.delegate 为弱引用，main.swift
+    /// 闭包局部变量在 release 优化下理论上可能被提前释放——静态持有杜绝整
+    /// 个壳（托盘/窗口/监控）随 delegate 回收而静默消失的一类整案
+    private static var retention: AppDelegate?
+
+    override init() {
+        super.init()
+        Self.retention = self
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard handleSingleInstance() else { NSApp.terminate(nil); return }
 
@@ -116,8 +126,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func buildStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        // SF Symbol 模板图标：自动适配菜单栏明暗（与站点「影视」类别图标同语义）
-        item.button?.image = NSImage(systemSymbolName: "clapperboard", accessibilityDescription: "微墨·豆瓣")
+        // 托盘位置记忆（用户 Cmd-拖动调整后跨启动恢复）
+        item.autosaveName = "MainStatusItem"
+        // 主图标=与 Tauri 版统一的白墨滴资产（app/icons/tray-icon.png，
+        // e38eac6 的 22.5% 圆角裁切纯白墨滴）；资产缺失回落 SF Symbol 再
+        // 回落文本 title，杜绝隐形托盘（clapperboard 符号实测部分 macOS 为 nil）
+        if let icon = trayIconImage() {
+            item.button?.image = icon
+            NSLog("[tray] 图标已挂载 墨滴 template")
+        } else if let symbolName = ["film", "book"].first(where: {
+            NSImage(systemSymbolName: $0, accessibilityDescription: nil) != nil
+        }), let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: "微墨·豆瓣") {
+            image.isTemplate = true
+            item.button?.image = image
+            NSLog("[tray] 墨滴资产缺失，回落 symbol=%@", symbolName)
+        } else {
+            item.button?.title = "微墨"
+            NSLog("[tray] SF Symbol 候选全不可用，回落文本 title")
+        }
 
         let menu = NSMenu()
 
@@ -162,6 +188,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         item.menu = menu
         statusItem = item
+    }
+
+    /// 墨滴托盘图标：bundle Resources/tray-icon.png（build-app.sh 从 Tauri 版
+    /// 资产拷入，只读不改）；dev 直跑无 bundle，回落仓库源资产
+    /// ../app/icons/tray-icon.png（dev.sh 的 cwd=app-mac）。isTemplate=true
+    /// 只取 alpha 形状、系统按菜单栏明暗自适配前景——暗色下即 Tauri 版纯白
+    /// 墨滴，亮色下系统描黑（Tauri 版已知亮色隐形的边界，即 e38eac6 注释
+    /// 预留的 template 方案）。18pt 逻辑尺寸，墨滴占画布 ~73% 留呼吸距
+    private func trayIconImage() -> NSImage? {
+        let url = Bundle.main.url(forResource: "tray-icon", withExtension: "png")
+            ?? URL(fileURLWithPath: "../app/icons/tray-icon.png")
+        guard let image = NSImage(contentsOfFile: url.path) else { return nil }
+        image.isTemplate = true
+        image.size = NSSize(width: 18, height: 18)
+        return image
     }
 
     // MARK: - 菜单动作
