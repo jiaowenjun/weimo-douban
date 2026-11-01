@@ -1,0 +1,55 @@
+/* 灵动岛同步通知的环形进度（配色/几何移植自 weimo-ui-core 演示页
+   app.css 的 top-bar-notice-demo__ring 系样例）：灰底环 + 绿色进度弧，
+   90ms 线性过渡抹平轮询回填的进度跳变（本站轮询 3s 一拍、逐拍跨多
+   个百分点，过渡只求不闪跳，进度读感与文案数字同拍） */
+.top-bar-sync-notice__ring {
+  width: 14px;
+  height: 14px;
+}
+
+.top-bar-sync-notice__ring-track {
+  stroke: hsl(0 0% 50% / 0.35);
+}
+
+.top-bar-sync-notice__ring-arc {
+  stroke: hsl(142 71% 45%);
+  transition: stroke-dashoffset 90ms linear;
+}
+
+/* 完成态：满环内侧描出对勾（pathLength=1 归一化，线绘制 1→0），与
+   进度弧同绿；整图轻微弹性 pop，「环变为了对勾」 */
+.top-bar-sync-notice__ring-check {
+  stroke: hsl(142 71% 45%);
+  animation: top-bar-sync-notice-check-draw 300ms cubic-bezier(0.33, 1, 0.68, 1) both;
+}
+
+@keyframes top-bar-sync-notice-check-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.top-bar-sync-notice__ring[data-done='true'] {
+  animation: top-bar-sync-notice-check-pop 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes top-bar-sync-notice-check-pop {
+  from {
+    scale: 0.8;
+  }
+
+  to {
+    scale: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .top-bar-sync-notice__ring-check,
+  .top-bar-sync-notice__ring[data-done='true'] {
+    animation-duration: 1ms;
+  }
+}

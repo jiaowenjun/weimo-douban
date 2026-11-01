@@ -1,11 +1,8 @@
 import { HashRouter, Navigate, Route, Routes, useLocation, useSearchParams } from 'react-router'
-import { TopBarNotice } from 'weimo-ui-core/components/top-bar-notice'
 import { SiteTemplate } from 'weimo-ui-template/components/site-template'
 import { TagBread } from 'weimo-ui-tagtree/components/tag-bread'
 
 import { DoubanUserProvider } from './site/douban-user-provider'
-import { useDoubanUser } from './site/douban-user'
-import { dismissFirstSyncDone, useFirstSyncPhase } from './site/first-sync'
 import {
   facetPathKey,
   facetValueLabel,
@@ -20,6 +17,7 @@ import { TopBarExport } from './site/marks-export'
 import { MarksPage } from './site/pages/marks-page'
 import { WelcomePage } from './site/pages/welcome-page'
 import { TopBarSearch } from './site/search-dialog'
+import { TopBarSyncNotice } from './site/top-bar-sync-notice'
 import { SiteSettingsProvider } from './site/site-settings-provider'
 import { SiteSidebar } from './site/site-sidebar'
 
@@ -108,36 +106,6 @@ function SiteShell() {
         />
       </Routes>
     </SiteTemplate>
-  )
-}
-
-/** 顶栏灵动岛（TopBarNotice）：首发同步进度全局可见（欢迎页/任意页
- *  顶部常驻），短文案——syncing「同步中 N%」、done「同步完成，共 N 条」
- *  （duration 2.4s 到点经 onDismissed 收起进 dismissed，退场动画由组件
- *  播完）；其余态（triggering/failed/dismissed/未登录）children 置空
- *  即收起。轮询生命周期在 FirstSyncPollingBridge，本组件纯展示 */
-function TopBarSyncNotice() {
-  const { uid } = useDoubanUser()
-  const phase = useFirstSyncPhase(uid)
-  const text =
-    phase?.phase === 'syncing'
-      ? phase.percent != null
-        ? `同步中 ${phase.percent}%`
-        : '同步中'
-      : phase?.phase === 'done'
-        ? `同步完成，共 ${phase.items} 条`
-        : null
-  return (
-    <TopBarNotice
-      duration={phase?.phase === 'done' ? 2_400 : undefined}
-      onDismissed={
-        uid && phase?.phase === 'done'
-          ? () => dismissFirstSyncDone(uid)
-          : undefined
-      }
-    >
-      {text}
-    </TopBarNotice>
   )
 }
 

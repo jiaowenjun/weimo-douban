@@ -1,7 +1,8 @@
 /** 首发同步会话级状态机 + 生命周期轮询（原住 marks-page，灵动岛通知
  *  上移 App 层后进度须全局可见、轮询不能随页面卸载停——提为本模块，
  *  订阅挂 DoubanUserProvider 内的 FirstSyncPollingBridge，展示挂
- *  App 的 TopBarNotice，触发由 marks-page 的 not-cached 态调用） */
+ *  top-bar-sync-notice（App topBarCenter），触发由 marks-page 的
+ *  not-cached 态调用） */
 import { useContext, useEffect, useSyncExternalStore } from 'react'
 
 import { queryClient } from '../query-client'
