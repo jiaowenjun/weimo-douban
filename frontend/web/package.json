@@ -20,7 +20,7 @@
     "weimo-ui-core": "~0.4.0",
     "weimo-ui-editor": "~0.4.2",
     "weimo-ui-stats": "~0.2.0",
-    "weimo-ui-tagtree": "~0.5.1",
+    "weimo-ui-tagtree": "~0.5.2",
     "weimo-ui-template": "^0.4.8",
     "weimo-wdf": "^0.1.0"
   },
