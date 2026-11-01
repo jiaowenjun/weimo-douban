@@ -9,7 +9,7 @@ pnpm --dir ../frontend/web build
 # 2) 无头服务器（release）
 cargo build --release --manifest-path server/Cargo.toml
 MCP_TARGET="$(rustc --print host-tuple)"
-cargo build --release --locked --manifest-path ../mcp/Cargo.toml --target "$MCP_TARGET"
+cargo build --release --locked --manifest-path ../mcp/Cargo.toml --bin weimo-douban-mcp --target "$MCP_TARGET"
 
 # 3) Swift 原生壳（release）
 swift build -c release

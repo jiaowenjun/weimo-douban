@@ -1,0 +1,37 @@
+[Unit]
+Description=Weimo Douban read-only HTTP MCP
+After=network.target weimo-douban.service
+Requires=weimo-douban.service
+PartOf=weimo-douban.service
+
+[Service]
+Type=simple
+User=weimo-mcp
+Group=weimo-mcp
+WorkingDirectory=/srv/weimo-douban
+EnvironmentFile=/etc/weimo-douban/mcp.env
+LoadCredential=mcp-token:/etc/weimo-douban/mcp.token
+ExecStart=/usr/local/libexec/weimo-douban-mcp-http --token-file %d/mcp-token
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=25
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ReadOnlyPaths=/srv/weimo-douban/data
+CapabilityBoundingSet=
+UMask=0077
+MemoryMax=384M
+CPUQuota=100%
+TasksMax=64
+LimitNOFILE=256
+
+[Install]
+WantedBy=multi-user.target

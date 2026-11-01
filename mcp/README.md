@@ -1,4 +1,41 @@
-# 本地 Agent 接入（stdio MCP）
+# AI 助手连接指南
+
+有两种连接方式：桌面 App 用户可以查询电脑中的本地备份；没有安装 App 的用户可以通过远程 MCP 查询服务器已同步并获准访问的记录。两者使用相同的五个只读工具，数据分别保存。
+
+## 远程连接（无需安装 App）
+
+远程 MCP 当前为邀请制，需要管理员提供独立访问凭证并开放对应账号。先在[网页版](https://weimo.ink/douban/)同步记录，再连接支持 **Streamable HTTP + 自定义请求头**的 AI 助手：
+
+| 设置 | 内容 |
+|---|---|
+| 地址 | `https://weimo.ink/douban/mcp` |
+| 传输方式 | Streamable HTTP（部分客户端显示为 HTTP） |
+| 请求头名称 | `Authorization` |
+| 请求头值 | `Bearer <管理员提供的 MCP 凭证>` |
+
+支持 `mcpServers` 格式的客户端可参考以下配置；具体字段名称以客户端为准，不要覆盖其他已配置的服务：
+
+```json
+{
+  "mcpServers": {
+    "weimo-douban-remote": {
+      "type": "http",
+      "url": "https://weimo.ink/douban/mcp",
+      "headers": { "Authorization": "Bearer <MCP 凭证>" }
+    }
+  }
+}
+```
+
+连接后先调用 `list_users`，以实际返回的账号为准。当前初始开放范围为 `wenjun30`；其他 UID 须由管理员配置，同步完成本身不会自动获得 MCP 访问权限。远程查询不读取你电脑中的备份，也不会触发豆瓣抓取。返回的 `data_source=server_cache` 表示服务器缓存；可用 `last_synced_at` 或 `sync` 检查最近同步时间。
+
+不要把凭证放进 URL、公开仓库或聊天内容。所有持有同一凭证的人都能查询该凭证开放的全部账号，包括短评；当前没有个人登录或 OAuth 授权。仅支持 OAuth 登录、无法设置请求头的客户端暂不可用。查询结果会进入所选助手的上下文，是否发送给云端模型取决于助手设置。
+
+遇到 401 请检查凭证和 `Bearer ` 前缀；429/503 请稍后重试；提示账号不在开放范围时，先查看 `list_users`；结果过大时减小 `limit` 或缩小筛选范围。远程服务有总请求额度和并发上限，不适合并行批量导出。切换远程连接不会修复客户端的工具参数解析问题，仍请参考[查询问题排查](troubleshooting.md)。
+
+自行部署见[远程 MCP 运维说明](../ops/mcp/README.md)。协议已通过官方 Rust MCP 客户端验证，具体 AI 客户端及模型需分别验证兼容性。
+
+## 本地连接（stdio）
 
 `weimo-douban-mcp` 是随桌面 App 分发的独立 Rust 可执行文件，使用官方 `rmcp 3.8.0`。Agent 负责启动它，通过 stdin/stdout 调用工具，不需要 Node.js、Python、HTTP 端口或运行中的 App。它读取 App 最后同步的数据，不启动抓取、订阅或后台 worker。
 
@@ -42,7 +79,7 @@ Windows：在安装目录中找到 `weimo-douban-mcp.exe`，在 PowerShell 中�
 
 | 工具 | 参数和行为 |
 |---|---|
-| `list_users` | 分页列出本地用户、标记数、最近同步时间；先选择 uid |
+| `list_users` | 分页列出可查询用户、标记数、最近同步时间；先选择 uid |
 | `search_marks` | 按 uid、类别、状态、关键词、用户星级、标记日期、作品年份、维度筛选标记及短评 |
 | `get_subject` | 按 category + subject_id 获取作品详情，包含豆瓣评分和分类元信息 |
 | `get_stats` | 按相同筛选条件计算类别/状态计数、用户星级分布、标记年份计数 |
@@ -81,7 +118,7 @@ Windows：在安装目录中找到 `weimo-douban-mcp.exe`，在 PowerShell 中�
 
 参见[AI 查询问题排查](troubleshooting.md)：包含最小调用、逐步加筛选条件的方法，以及 2026-11-01 在 ZCode + GLM-5.3 中观察到的参数解析失败案例。该案例不代表所有模型、客户端或版本都有相同问题。
 
-## 只读边界与生命周期
+## 本地连接的只读边界与生命周期
 
 数据库连接启用 SQLite `read_only` 和 `query_only`，不执行 bootstrap、迁移、导出或任意 SQL。WAL 的辅助文件仍可能由 SQLite 为协调读取而创建；这是数据库协调行为，不是业务数据写入。查询使用短读事务，提交后才组装结果，不跨 Agent 调用持有事务。
 

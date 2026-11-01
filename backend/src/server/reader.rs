@@ -6,6 +6,7 @@ use chrono::NaiveDate;
 use serde_json::{json, Value};
 use sqlx::{QueryBuilder, Row, Sqlite, SqlitePool};
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::Arc;
 
 use super::{db, dims, subject};
 use crate::crawler::{Category, Record, Status};
@@ -105,6 +106,7 @@ impl MarkFilter {
 #[derive(Clone)]
 pub struct Reader {
     pool: SqlitePool,
+    allowed_uids: Option<Arc<BTreeSet<String>>>,
 }
 
 struct Selection {
@@ -116,22 +118,69 @@ impl Reader {
     pub async fn open(path: &std::path::Path) -> Result<Self> {
         Ok(Self {
             pool: db::connect_read_only(path).await?,
+            allowed_uids: None,
         })
+    }
+
+    /// Restrict all reader entry points, including discovery and subject lookup.
+    /// Empty scope is rejected; it must never mean unrestricted access.
+    pub fn restrict_to(mut self, uids: Vec<String>) -> Result<Self> {
+        ensure!(
+            !uids.is_empty() && uids.len() <= 100,
+            "开放用户范围须为 1–100 个 uid"
+        );
+        ensure!(
+            uids.iter()
+                .all(|u| !u.trim().is_empty() && u.len() <= 200 && u.trim() == u),
+            "开放 uid 无效"
+        );
+        let uids: BTreeSet<String> = uids.into_iter().collect();
+        if let Some(existing) = &self.allowed_uids {
+            ensure!(uids.is_subset(existing), "不能扩大已有查询权限");
+        }
+        self.allowed_uids = Some(Arc::new(uids));
+        Ok(self)
+    }
+
+    fn check_uid(&self, uid: &str) -> Result<()> {
+        ensure!(
+            self.allowed_uids
+                .as_ref()
+                .is_none_or(|uids| uids.contains(uid)),
+            "该 uid 不在服务开放范围内；请调用 list_users 查看可用用户"
+        );
+        Ok(())
+    }
+
+    fn scope_sql(&self, query: &mut QueryBuilder<'_, Sqlite>, column: &str) {
+        if let Some(uids) = &self.allowed_uids {
+            query.push(" AND ").push(column).push(" IN (");
+            let mut values = query.separated(",");
+            for uid in uids.iter() {
+                values.push_bind(uid.clone());
+            }
+            query.push(")");
+        }
     }
 
     pub async fn list_users(&self, limit: usize, offset: usize) -> Result<Value> {
         validate_page(limit, offset)?;
         // One SQL statement gives count and page a consistent snapshot, including an empty page.
-        let rows = sqlx::query("WITH uids(uid) AS (
+        let mut query = QueryBuilder::<Sqlite>::new(
+            "WITH all_uids(uid) AS (
             SELECT uid FROM users UNION SELECT uid FROM records
             UNION SELECT uid FROM subscriptions UNION SELECT user FROM tasks
-        ), page AS (
+        ), uids AS (SELECT uid FROM all_uids WHERE 1=1",
+        );
+        self.scope_sql(&mut query, "uid");
+        query.push("), page AS (
             SELECT u.uid, us.username,
                 (SELECT COUNT(*) FROM records r WHERE r.uid=u.uid) AS records,
                 (SELECT MAX(fetched_ms) FROM dimensions d WHERE d.uid=u.uid) AS synced_ms
-            FROM uids u LEFT JOIN users us ON us.uid=u.uid ORDER BY u.uid LIMIT ? OFFSET ?
-        ) SELECT page.*, (SELECT COUNT(*) FROM uids) AS total FROM (SELECT 1) LEFT JOIN page ON 1=1")
-            .bind(limit as i64).bind(offset as i64).fetch_all(&self.pool).await?;
+            FROM uids u LEFT JOIN users us ON us.uid=u.uid ORDER BY u.uid LIMIT ")
+            .push_bind(limit as i64).push(" OFFSET ").push_bind(offset as i64)
+            .push(") SELECT page.*, (SELECT COUNT(*) FROM uids) AS total FROM (SELECT 1) LEFT JOIN page ON 1=1");
+        let rows = query.build().fetch_all(&self.pool).await?;
         let total: i64 = rows[0].get("total");
         let items: Vec<Value> = rows.iter().filter_map(|r| {
             let uid: Option<String> = r.get("uid");
@@ -147,6 +196,19 @@ impl Reader {
             "category 须为 movie/book/music"
         );
         ensure!(!subject_id.is_empty(), "subject_id 不能为空");
+        if self.allowed_uids.is_some() {
+            let mut query = QueryBuilder::<Sqlite>::new("SELECT EXISTS(SELECT 1 FROM records r
+                JOIN dimensions d ON d.uid=r.uid AND d.category=r.category AND d.dim_status=r.dim_status
+                WHERE (d.state IN ('ok','running') OR d.fetched_ms IS NOT NULL) AND r.category=");
+            query
+                .push_bind(category.to_owned())
+                .push(" AND r.subject_id=")
+                .push_bind(subject_id.to_owned());
+            self.scope_sql(&mut query, "r.uid");
+            query.push(")");
+            let allowed: bool = query.build_query_scalar().fetch_one(&self.pool).await?;
+            ensure!(allowed, "条目不在开放范围内或尚无同步数据");
+        }
         let mut view =
             subject::get_subject_view_from_pool(&self.pool, category, subject_id).await?;
         remove_cover(&mut view);
@@ -250,6 +312,7 @@ impl Reader {
     }
 
     async fn select(&self, filter: &MarkFilter) -> Result<Selection> {
+        self.check_uid(&filter.uid)?;
         filter.validate()?;
         // A short read transaction pins metadata and marks to the same committed snapshot.
         // Finish all DB work before formatting or returning data to a slow MCP client.

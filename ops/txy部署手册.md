@@ -390,6 +390,8 @@ ssh txy 'journalctl -u weimo-douban -n 100 --no-pager'
 
 ## 7. 日常更新流程
 
+远程 MCP 独立服务的构建、鉴权、账号范围、Nginx 配置与回滚见 [MCP 运维说明](mcp/README.md)。仅更新 MCP 时不重启 8020 同步后端，不触发 App 版本发布。
+
 适用：业务变更已在本地完成验证、单独提交并推送 main。前端产物静态同步即生效，后端变更需重启 unit。
 
 ```bash

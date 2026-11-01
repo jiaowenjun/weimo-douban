@@ -201,3 +201,44 @@ async fn reader_observes_commits_while_writer_is_alive_without_seeing_uncommitte
     tx.commit().await.unwrap();
     assert_eq!(reader.search_marks(&f, 20, 0).await.unwrap()["total"], 1);
 }
+
+#[tokio::test]
+async fn restricted_reader_scopes_discovery_filters_and_subjects() {
+    let (_dir, writer, reader) = fixture().await;
+    sqlx::query("INSERT INTO dimensions(uid,category,dim_status,state) VALUES('bob','movie','collect','ok')")
+        .execute(&writer).await.unwrap();
+    sqlx::query("INSERT INTO records(uid,category,dim_status,subject_id,title) VALUES('bob','movie','collect','private','Bob only')")
+        .execute(&writer).await.unwrap();
+    assert!(reader.clone().restrict_to(vec![]).is_err());
+    assert!(reader.clone().restrict_to(vec![" alice".into()]).is_err());
+    let scoped = reader.clone().restrict_to(vec!["alice".into()]).unwrap();
+    assert!(scoped.clone().restrict_to(vec!["bob".into()]).is_err());
+    let users = scoped.list_users(1, 0).await.unwrap();
+    assert_eq!(users["total"], 1);
+    assert_eq!(users["items"][0]["uid"], "alice");
+    let empty_page = scoped.list_users(1, 1).await.unwrap();
+    assert_eq!(empty_page["total"], 1);
+    assert_eq!(empty_page["items"], json!([]));
+    assert_eq!(
+        scoped.search_marks(&filter(), 20, 0).await.unwrap()["total"],
+        4
+    );
+    for uid in ["bob", "only-sub", "alice' OR 1=1 --", ""] {
+        let forbidden = MarkFilter {
+            uid: uid.into(),
+            ..Default::default()
+        };
+        assert!(scoped.search_marks(&forbidden, 20, 0).await.is_err());
+        assert!(scoped.get_stats(&forbidden).await.is_err());
+        assert!(scoped
+            .list_facets(&forbidden, "genres", 20, 0)
+            .await
+            .is_err());
+    }
+    assert!(scoped.get_subject("movie", "1").await.is_ok());
+    assert!(scoped.get_subject("movie", "3").await.is_ok()); // intro fallback
+    for (category, id) in [("movie", "private"), ("music", "bad"), ("movie", "missing")] {
+        assert!(scoped.get_subject(category, id).await.is_err());
+    }
+    assert!(reader.get_subject("movie", "private").await.is_ok()); // local remains unrestricted
+}
