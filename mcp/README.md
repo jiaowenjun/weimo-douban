@@ -48,6 +48,8 @@ Windows：在安装目录中找到 `weimo-douban-mcp.exe`，在 PowerShell 中�
 | `get_stats` | 按相同筛选条件计算类别/状态计数、用户星级分布、标记年份计数 |
 | `list_facets` | 按相同筛选条件聚合指定维度，按计数降序分页 |
 
+先调用 `list_users` 取得实际 `uid`。`search_marks`、`get_stats`、`list_facets` 每次都必须传入 `uid`，即使本地只有一个用户。参数直接放在工具参数对象的顶层，不要额外包在 `filter` 或 `page` 对象中。
+
 查询示例：“我 2026 年看过的五星电影”对应：
 
 ```json
@@ -72,6 +74,12 @@ Windows：在安装目录中找到 `weimo-douban-mcp.exe`，在 PowerShell 中�
 - 结果同时提供 `structuredContent` 和 JSON 文本。查询只使用已发布的 records，刷新中仍可读上次快照；首次同步 running 状态可读已入库部分。`sync` 返回各维度状态、上次完成同步时间，不能将 running 数据当作完整结果。
 - 元信息沿用 App 的 rexxar 优先、intro 解析回退，`metadata_source`/`source` 表明来源。返回豆瓣条目链接，省略需要本地 HTTP 服务的封面代理。
 - 每次查询最多读取 50,000 条经基础条件筛选的候选标记；超限会要求缩小范围，不会返回静默截断的统计。工具设 15 秒超时；数据库忙时返回可重试错误。详情或评论仍可能较长，必要时缩小页数。
+
+## 查询失败时
+
+展开助手的调用详情，核对实际参数和原始错误。若显示 `{}` 或 `Tool input failed inputSchema validation`，不能仅凭助手说「忘记传 uid」就认定原因；客户端可能在解析模型参数失败后将其替换为空对象。
+
+参见[AI 查询问题排查](troubleshooting.md)：包含最小调用、逐步加筛选条件的方法，以及 2026-11-01 在 ZCode + GLM-5.3 中观察到的参数解析失败案例。该案例不代表所有模型、客户端或版本都有相同问题。
 
 ## 只读边界与生命周期
 
