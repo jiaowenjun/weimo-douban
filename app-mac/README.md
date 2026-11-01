@@ -41,9 +41,15 @@ WeimoDoubanNative.app（单进程 + sidecar）
   同端点同口径——任务 `queued/running → completed/partial/failed` 跃迁、
   `subjects_pending >0 → 0` 跃迁发系统通知，点击唤起主窗口；首帧只建
   基线不回放历史。dev 直跑（无 bundle id）通知降级为日志。
-- **托盘菜单**：打开主窗口 / 状态行（同步中 P% · 详情拉取中 N 条 · 空闲）/
-  立即同步（全部已登记用户 POST）/ 打开数据文件夹 / 开机自启（SMAppService）/
-  GitHub 仓库 / 退出。
+- **托盘菜单**：打开主窗口 / 唤起快捷键（录制面板）/ 状态行（同步中 P% ·
+  详情拉取中 N 条 · 空闲）/ 立即同步（全部已登记用户 POST）/ 打开数据文件夹 /
+  开机自启（SMAppService）/ GitHub 仓库 / 退出。
+- **全局快捷键**（路线图 1.5）：Carbon `RegisterEventHotKey`（非沙盒系统级
+  热键标准通道），默认 ⌘⇧M 唤起/收起主窗口（App 前台且窗口可见时热键=收起，
+  Raycast 式 toggle）；组合经托盘菜单录制面板重录，UserDefaults 持久化，
+  注册失败（被占用）告警不致命。**2.3 唤起直落搜索暂缓**：前端搜索功能
+  未实现（TopBarSearch 为占位弹窗），落地后在唤起分支补一行
+  `evaluateJavaScript` 聚焦搜索框即可（原生壳无 IPC 墙）。
 
 ## 构建与运行
 
@@ -73,9 +79,9 @@ curl http://127.0.0.1:<port>/healthz        # {"status":"ok"}（根路径，不�
 
 ## v1 范围外（后续项，见路线图）
 
-- 全局快捷键唤起（P1，Carbon RegisterEventHotKey）
 - 自动更新：GitHub `latest.json` 属 Tauri 版版本线，与本壳版本不可比；
   分发与更新方案待定（Sparkle 或独立 manifest）后再做
+- 唤起直落搜索（2.3）：等前端搜索功能实现后补一行 evaluateJavaScript
 - 深链接、标题栏一体化（P2/P3，见路线图）
 
 ## 已知待实测

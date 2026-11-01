@@ -70,6 +70,16 @@ final class MainWindowController: NSObject, NSWindowDelegate, WKNavigationDelega
         NSApp.activate(ignoringOtherApps: true)
     }
 
+    /// 全局快捷键的收起判定：窗口可见 + 是 key window + App 在前台
+    /// （用户正看着本 App）→ 此时热键语义为收起；其余情况唤起
+    var isFrontmostVisible: Bool {
+        window.isVisible && window.isKeyWindow && NSApp.isActive
+    }
+
+    func hide() {
+        window.orderOut(nil)
+    }
+
     // MARK: NSWindowDelegate —— 关窗 = 隐藏（托盘常驻）
 
     func windowShouldClose(_ sender: NSWindow) -> Bool {

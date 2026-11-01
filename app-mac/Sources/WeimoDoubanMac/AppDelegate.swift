@@ -15,6 +15,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusLineItem: NSMenuItem?
     private var syncNowItem: NSMenuItem?
     private var launchAtLoginItem: NSMenuItem?
+    private var hotKeyItem: NSMenuItem?
+
+    // 全局快捷键（路线图 1.5）：⌘⇧M 唤起/收起，托盘菜单可重录
+    private let hotKey = HotKeyCenter()
+    private var hotKeyRecorder: HotKeyRecorder?
 
     /// 进程存活期的强引用兜底：NSApplication.delegate 为弱引用，main.swift
     /// 闭包局部变量在 release 优化下理论上可能被提前释放——静态持有杜绝整
@@ -39,6 +44,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         warnIfTauriRunning()
         buildStatusItem()
+
+        // 全局快捷键：注册失败（组合被占）不致命——告警一次，可经托盘菜单重录
+        hotKey.onTrigger = { [weak self] in self?.hotkeyTriggered() }
+        if !hotKey.register() {
+            alert("全局快捷键 \(hotKey.displayCombo) 注册失败（可能被其他 App 占用），可在托盘菜单「唤起快捷键」重新录制。")
+        }
 
         sidecar.onReady = { [weak self] baseURL in
             self?.serverReady(baseURL: baseURL)
@@ -152,6 +163,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         open.keyEquivalentModifierMask = .command
         menu.addItem(open)
 
+        let hotKeyItem = NSMenuItem(title: "唤起快捷键：\(hotKey.displayCombo)…", action: #selector(hotKeyTapped), keyEquivalent: "")
+        hotKeyItem.target = self
+        menu.addItem(hotKeyItem)
+        self.hotKeyItem = hotKeyItem
+
         let statusLine = NSMenuItem(title: "状态：启动中…", action: nil, keyEquivalent: "")
         statusLine.isEnabled = false
         menu.addItem(statusLine)
@@ -210,6 +226,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func showMainWindow() {
         // 服务未就绪时窗口尚未创建（就绪即自动弹出，此处无操作）
         windowController?.show()
+    }
+
+    /// 全局快捷键 toggle：用户正看着本 App（窗口可见且前台）→ 收起；
+    /// 其余情况唤起聚焦（Raycast 式随手查）。2.3 直落搜索待前端搜索功能
+    /// 落地后在唤起分支补 evaluateJavaScript 聚焦搜索框
+    private func hotkeyTriggered() {
+        if let controller = windowController, controller.isFrontmostVisible {
+            controller.hide()
+        } else {
+            windowController?.show()
+        }
+    }
+
+    /// 托盘菜单「唤起快捷键」：打开录制面板换绑
+    @objc private func hotKeyTapped() {
+        let recorder = HotKeyRecorder(currentCombo: hotKey.displayCombo)
+        recorder.onRecord = { [weak self] keyCode, modifiers, display in
+            guard let self else { return }
+            if self.hotKey.update(keyCode: keyCode, modifiers: modifiers, display: display) {
+                self.hotKeyItem?.title = "唤起快捷键：\(self.hotKey.displayCombo)…"
+            } else {
+                self.alert("组合 \(self.hotKey.displayCombo) 注册失败（可能被其他 App 占用），请换一个")
+            }
+        }
+        recorder.onRestoreDefault = { [weak self] in
+            guard let self else { return }
+            self.hotKey.restoreDefault()
+            self.hotKeyItem?.title = "唤起快捷键：\(self.hotKey.displayCombo)…"
+        }
+        recorder.onClose = { [weak self] in self?.hotKeyRecorder = nil }
+        hotKeyRecorder = recorder
     }
 
     @objc private func syncNowTapped() {
