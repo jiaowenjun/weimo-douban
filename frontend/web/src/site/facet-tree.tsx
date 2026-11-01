@@ -136,7 +136,9 @@ function buildMovieNodes(
     byTag.set(kindTag, { category: 'movie', path: [{ dim: kindKey, value }] })
     return {
       tag: kindTag,
-      label: value,
+      // label 走展示名映射：pending 形态显示「影视（分类中）」（URL/tag
+      // 语义值不变）；电影/电视剧原样
+      label: facetValueLabel('movie', kindKey, value),
       itemCount: count,
       icon: KIND_ICONS[value] ?? CATEGORY_ICONS.movie,
       children: buildGroupedChildren(

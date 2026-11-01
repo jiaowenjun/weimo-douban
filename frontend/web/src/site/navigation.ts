@@ -36,10 +36,20 @@ export const CATEGORY_NOUNS: Record<MarksCategory, string> = {
  *  marks-page/facet-tree 的形态值比对同款） */
 export const DEFAULT_MOVIE_KIND = '电影'
 
+/** is_tv 派生形态值域（facet-engine 的 itemValues 同源字面量）：
+ *  未富集条目归 pending（同步中/富集排队的暂态合并视图），富集完成
+ *  后自动归位 movie/tv；MarksRoute 重定向兜底值与展示名映射共用 */
+export const MOVIE_KIND_VALUES = {
+  movie: '电影',
+  tv: '电视剧',
+  pending: '分类中',
+} as const
+
 /** movie 页展示标题（document.title/占位文案）：形态即一级（电影/
- *  电视剧），无「影视」聚合名；kind 为 is_tv 步值，缺省兜底 */
+ *  电视剧），无「影视」聚合名；pending 归位聚合名「影视」（该批即
+ *  未细分的影视混合）；kind 缺省兜底默认形态 */
 export function moviePageTitle(kind: string | undefined): string {
-  return `看过的${kind ?? DEFAULT_MOVIE_KIND}`
+  return `看过的${kind === MOVIE_KIND_VALUES.pending ? CATEGORY_NOUNS.movie : (kind ?? DEFAULT_MOVIE_KIND)}`
 }
 
 /** 页面标题动词：看过的影视 / 读过的图书 / 听过的音乐 */

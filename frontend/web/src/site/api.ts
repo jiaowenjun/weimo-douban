@@ -298,6 +298,8 @@ export type DoubanSyncTaskView = {
   status: string
   /** 任务总进度百分比（0-100）；completed 恒为 100，未终态封顶 99，无法判定为 null */
   percent: number | null
+  /** 任务累计条目数（各成功维度 items 之和）；终态横幅「共 N 条」数据源 */
+  items_count: number
 }
 
 /** 触发自助首发同步：POST /users/{uid}/syncs——服务端固定全类别 collect、

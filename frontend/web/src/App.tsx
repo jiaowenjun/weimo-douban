@@ -3,6 +3,8 @@ import { SiteTemplate } from 'weimo-ui-template/components/site-template'
 import { TagBread } from 'weimo-ui-tagtree/components/tag-bread'
 
 import { DoubanUserProvider } from './site/douban-user-provider'
+import { useDoubanDimsQuery } from './site/douban-queries'
+import { useDoubanUser } from './site/douban-user'
 import {
   facetPathKey,
   facetValueLabel,
@@ -12,6 +14,7 @@ import {
   CATEGORY_NOUNS,
   DEFAULT_MARKS_PATH,
   DEFAULT_MOVIE_KIND,
+  MOVIE_KIND_VALUES,
   moviePageTitle,
   resolveMarksView,
 } from './site/navigation'
@@ -74,15 +77,32 @@ function useFacetBreadcrumb() {
 /** /:category 路由外壳：movie 的电影/电视剧是真一级——无形态步
  *  （is_tv）的路径（裸 /movie 或手改 URL 缺步）重定向规范为补默认
  *  形态前置步、保留其余步骤（replace 不留历史），「影视」聚合页随之
- *  不复存在 */
+ *  不复存在。默认值按形态数据就绪度选：任一条目 is_tv 已富集（维度
+ *  完成+富集出首批）→「电影」；未就绪（首发同步中/富集排队，全部
+ *  归分类中）→ 降级「分类中」合并视图，渐进条目直接可读。就绪后
+ *  下次导航自然规范化（停留不跳变——Navigate 后本组件已卸载） */
 function MarksRoute() {
   const { pathname } = useLocation()
   const [searchParams] = useSearchParams()
-  if (pathname.split('/')[1] === 'movie') {
+  const isMovie = pathname.split('/')[1] === 'movie'
+  const { uid } = useDoubanUser()
+  // 与侧边栏共享同一 query key（命中缓存零新增请求）；非 movie 路由
+  // 传 null 保持禁用
+  const dimsQuery = useDoubanDimsQuery(
+    isMovie && uid ? uid : null,
+    isMovie ? 'movie' : null,
+  )
+  if (isMovie) {
     const path = parseFacetPath('movie', searchParams.get('facet'))
     if (!path.some((step) => step.dim === 'is_tv')) {
+      const kindReady = dimsQuery.data
+        ? dimsQuery.data.items.some((item) => item.dims.is_tv !== undefined)
+        : false
       const canonical = facetPathKey([
-        { dim: 'is_tv', value: DEFAULT_MOVIE_KIND },
+        {
+          dim: 'is_tv',
+          value: kindReady ? DEFAULT_MOVIE_KIND : MOVIE_KIND_VALUES.pending,
+        },
         ...path,
       ])
       return (

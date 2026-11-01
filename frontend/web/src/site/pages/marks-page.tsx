@@ -26,6 +26,7 @@ import {
   CATEGORY_PAST_VERBS,
   CATEGORY_UNIT_NOUNS,
   DEFAULT_MARKS_PATH,
+  MOVIE_KIND_VALUES,
   moviePageTitle,
   parseRatingParam,
   ratingFilterLabel,
@@ -38,14 +39,16 @@ const PAGE_SIZE = MARKS_PAGE_SIZE
 
 /** 首发同步会话级状态（跨导航存活）：uid → 进度。triggering=POST 进行
  *  中；syncing=任务运行中（携带 task_id 供轮询，percent 随轮询回填）；
- *  done=任务终态（completed/partial/failed），停轮询收起横幅；failed=
- *  触发失败（回落手动指引文案）。重复触发本身无害（后端 single-flight
- *  并入运行中任务），会话级去重只为避免每次导航到未同步视图都发一次
- *  POST；刷新页面后 Map 清空重触发亦安全 */
+ *  done=任务到终态（completed/partial），完成横幅「共 N 条」展示中，
+ *  2.4s 后自动转 dismissed；dismissed=横幅已收起（含 failed 终态，静
+ *  默收起不打扰）；failed=触发失败（回落手动指引文案）。重复触发本身
+ *  无害（后端 single-flight 并入运行中任务），会话级去重只为避免每次
+ *  导航到未同步视图都发一次 POST；刷新页面后 Map 清空重触发亦安全 */
 type FirstSync =
   | { phase: 'triggering' }
   | { phase: 'syncing'; taskId: string; percent?: number }
-  | { phase: 'done' }
+  | { phase: 'done'; items: number }
+  | { phase: 'dismissed' }
   | { phase: 'failed' }
 
 /** Map 是模块级可变源，组件须经 useSyncExternalStore 订阅读取——render
@@ -54,8 +57,38 @@ type FirstSync =
 const firstSyncState = new Map<string, FirstSync>()
 const firstSyncListeners = new Set<() => void>()
 
+/** 运行中任务的跨 reload 恢复源：直写渐进后维度一入队 marks 即 200
+ *  （可能空列表），not-cached 触发窗口随之消失——刷新/导航回来的新
+ *  页面实例须靠它恢复 syncing 态（带 taskId 即可重启轮询，终态自然
+ *  收敛）；sessionStorage 的会话级语义与 Map 天然同生命周期 */
+const FIRST_SYNC_TASK_KEY = 'weimo-douban:first-sync-task'
+
+function persistFirstSyncTask(uid: string, taskId: string | null) {
+  try {
+    if (taskId) sessionStorage.setItem(FIRST_SYNC_TASK_KEY, JSON.stringify({ uid, taskId }))
+    else sessionStorage.removeItem(FIRST_SYNC_TASK_KEY)
+  } catch {
+    // 存储不可用仅丢失跨刷新恢复，会话内链路不受影响
+  }
+}
+
+function restoreFirstSyncTask() {
+  try {
+    const raw = sessionStorage.getItem(FIRST_SYNC_TASK_KEY)
+    if (!raw) return
+    const parsed = JSON.parse(raw) as { uid?: unknown; taskId?: unknown }
+    if (typeof parsed.uid === 'string' && typeof parsed.taskId === 'string') {
+      firstSyncState.set(parsed.uid, { phase: 'syncing', taskId: parsed.taskId })
+    }
+  } catch {
+    // 畸形存储按无恢复源处理
+  }
+}
+restoreFirstSyncTask()
+
 function setFirstSync(uid: string, value: FirstSync) {
   firstSyncState.set(uid, value)
+  persistFirstSyncTask(uid, value.phase === 'syncing' ? value.taskId : null)
   for (const notify of firstSyncListeners) notify()
 }
 
@@ -249,7 +282,19 @@ export function MarksPage() {
           const current = firstSyncState.get(uid)
           if (SYNC_TASK_TERMINAL.has(task.status)) {
             if (current?.phase === 'syncing') {
-              setFirstSync(uid, { phase: 'done' })
+              // 终态时刻维度数据已全部定格：立即补一次版本失效，让最后
+              // 几页落库尽快拉全（完成横幅报「共 N 条」时列表尽量对齐）
+              void queryClient.invalidateQueries({
+                queryKey: [...doubanQueryKeys.uid(uid), 'versions'],
+              })
+              // completed/partial 给完成句号（items_count=已获取条数）；
+              // failed 静默收起——无数据走手动指引，有部分数据也不庆祝
+              setFirstSync(
+                uid,
+                task.status === 'failed'
+                  ? { phase: 'dismissed' }
+                  : { phase: 'done', items: Math.max(0, task.items_count) },
+              )
             }
           } else if (
             current?.phase === 'syncing' &&
@@ -265,6 +310,16 @@ export function MarksPage() {
       clearInterval(timer)
     }
   }, [syncTaskId, uid])
+
+  // 完成横幅的收起时序：全显 ~2s 后随 CSS 动画淡出（共 2.4s），动画
+  // 播完卸载元素进入会话终态；items 是 done 态的稳定标识（effect 只在
+  // 进入/离开 done 时重跑，StrictMode 双跑被 cleanup 清理，幂等）
+  const doneItems = syncPhase?.phase === 'done' ? syncPhase.items : null
+  useEffect(() => {
+    if (doneItems === null || !uid) return
+    const timer = setTimeout(() => setFirstSync(uid, { phase: 'dismissed' }), 2_400)
+    return () => clearTimeout(timer)
+  }, [doneItems, uid])
 
   async function loadMore() {
     if (
@@ -367,18 +422,21 @@ export function MarksPage() {
     const hasMore = state.items.length < state.total
     const syncedDate = formatDate(state.cachedAt)
     // meta 行名词：影视筛了电影/电视剧形态时提升为该形态（…部电影/
-    // …部电视剧），该步从后缀去除避免「部电影 · 电影」重复；「分类中」
-    // 形态与其他类别不提升。all 合并视图为「已标记 N 条书影音」，评分
-    // 筛选时后缀追加「· 我的N星标记」
+    // …部电视剧）；形态步恒从后缀去除——电影/电视避免「部电影 · 电影」
+    // 重复，分类中（未细分）时「N 部影视」已是聚合表达、后缀无增量。
+    // all 合并视图为「已标记 N 条书影音」，评分筛选时后缀追加
+    // 「· 我的N星标记」
     const kindStep =
       realCategory === 'movie'
         ? facetPath.find((step) => step.dim === 'is_tv')
         : undefined
     const kindNoun =
-      kindStep && (kindStep.value === '电影' || kindStep.value === '电视剧')
+      kindStep &&
+      (kindStep.value === MOVIE_KIND_VALUES.movie ||
+        kindStep.value === MOVIE_KIND_VALUES.tv)
         ? `部${kindStep.value}`
         : null
-    const suffixPath = kindNoun
+    const suffixPath = kindStep
       ? facetPath.filter((step) => step.dim !== 'is_tv')
       : facetPath
     content = (
@@ -386,6 +444,11 @@ export function MarksPage() {
         {syncPhase?.phase === 'syncing' ? (
           <p className="marks-page__syncing">
             {`正在从豆瓣同步其余标记${syncPhase.percent != null ? `（${syncPhase.percent}%）` : ''}，已同步部分即时展示`}
+          </p>
+        ) : null}
+        {syncPhase?.phase === 'done' ? (
+          <p className="marks-page__syncing marks-page__syncing--done">
+            {`同步完成，共 ${syncPhase.items} 条`}
           </p>
         ) : null}
         <p className="marks-page__meta">

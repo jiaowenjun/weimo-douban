@@ -1,3 +1,4 @@
+import { MOVIE_KIND_VALUES } from './navigation.ts'
 import type { MarksCategory, NavTarget } from './navigation'
 
 /** 分面维度的展示顺序与文案（键集合由后端保证，顺序与命名归前端）。
@@ -73,13 +74,22 @@ export const KIND_DIMENSION: { key: 'is_tv'; label: string } | null =
  *  facet-engine），与后端 facets::OTHER_VALUE 对齐 */
 export const OTHER_FACET_VALUE = '__other__'
 
-/** 值的展示名：保留字面量 → 维度配置的 otherLabel（其他地区），缺省
- *  「其他+维度名」（其他类型/其他出版社），其余原样 */
+/** 值的展示名：影视 pending 形态扩为「影视（分类中）」（聚合名+进行
+ *  中示意，树节点/面包屑/meta 同源）；保留字面量 → 维度配置的
+ *  otherLabel（其他地区），缺省「其他+维度名」（其他类型/其他出版
+ *  社），其余原样 */
 export function facetValueLabel(
   category: MarksCategory,
   dim: string,
   value: string,
 ): string {
+  if (
+    category === 'movie' &&
+    dim === 'is_tv' &&
+    value === MOVIE_KIND_VALUES.pending
+  ) {
+    return `影视（${value}）`
+  }
   if (value !== OTHER_FACET_VALUE) return value
   const entry = DIMENSIONS[category].find((d) => d.key === dim)
   return entry?.otherLabel ?? `其他${entry?.label ?? dim}`
