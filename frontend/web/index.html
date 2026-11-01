@@ -5,6 +5,22 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>微墨·豆瓣</title>
+    <style>
+      html {
+        background-color: hsl(40 16% 96%);
+      }
+
+      html.dark {
+        background-color: hsl(0 0% 7%);
+        color-scheme: dark;
+      }
+    </style>
+    <script>
+      document.documentElement.classList.toggle(
+        'dark',
+        window.matchMedia('(prefers-color-scheme: dark)').matches,
+      )
+    </script>
   </head>
   <body>
     <div id="root"></div>
