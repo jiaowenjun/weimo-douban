@@ -488,9 +488,10 @@ curl -fsS "https://weimo.ink$JS" | grep -F -c "$DATE"   # ≥1
 # 3) 人工：浏览器开 https://weimo.ink/douban/ 页脚 == "v$VER · $DATE"，
 #    下载直链（CTA 按钮）可命中 v$VER 资产
 
-# 4) Gitee 国内镜像同版本（大陆下载入口，免登录）：
-curl -fsS "https://gitee.com/jiaowenjun/weimo-douban/releases/tags/v$VER" | jq -r '.tag_name'
-#   期望 v$VER；发行版页附件应为本次全套（双平台六件 / 仅 mac 四件）
+# 4) Gitee 国内镜像同版本（大陆下载入口，免登录；注意必须打 /api/v5，
+#    打到网页 releases/tags URL 会 302 去 archive 下载、jq 解析必炸）：
+curl -fsS "https://gitee.com/api/v5/repos/jiaowenjun/weimo-douban/releases/tags/v$VER" | jq -r '.tag_name, (.assets|length)'
+#   期望 v$VER 与资产数 ≥6（双平台六件 / 仅 mac 四件）
 #   且更新清单（App 自动更新的 Gitee 端点，raw 缓存 60s）同版本：
 curl -fsSL "https://gitee.com/jiaowenjun/weimo-douban/raw/app-latest/latest.json" | jq -r '.version'
 ```
