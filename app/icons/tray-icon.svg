@@ -1,47 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="微墨·豆瓣 托盘图标">
-  <!-- 微墨·豆瓣 托盘（菜单栏）图标源稿：与 icon.svg 同稿，但自带 22.5% 圆角裁切
-       （rx=230.4，四角透明）。Dock 对满出血 icns 会加系统圆角蒙版，菜单栏
-       NSStatusItem 不裁切、直角原样露出，故托盘需独立圆角资产；22.5% 与
-       frontend welcome-page 对 app-icon 的 css 圆角口径一致。
+  <!-- 微墨·豆瓣 托盘（菜单栏）图标源稿：无边框、透明背景的纯白墨滴字形。
+       菜单栏 NSStatusItem 不裁切、无系统底板，深色菜单栏下白字高对比；
+       墨滴轮廓取自 weimo-logo.svg（512 视框），×1.8 放大后居中，占画布
+       高约 73% 留出与相邻菜单栏图标的呼吸距；纯白平涂不带高光（白上白
+       隐形）与渐变（菜单栏 1x 实际渲染约 17px，细层次只会糊）。
+       注意：亮色菜单栏下纯白会隐形，如需自动适配再改 template 图像方案。
        再生方式：rsvg-convert -w 256 -h 256 tray-icon.svg -o tray-icon.png -->
-  <defs>
-    <clipPath id="rounded">
-      <rect width="1024" height="1024" rx="230.4"/>
-    </clipPath>
-    <radialGradient id="paper" cx="0.5" cy="0.42" r="0.85">
-      <stop offset="0" stop-color="#f8f4ec"/>
-      <stop offset="0.7" stop-color="#f5f0e6"/>
-      <stop offset="1" stop-color="#efe8da"/>
-    </radialGradient>
-    <linearGradient id="inkTone" x1="0.18" y1="0.08" x2="0.82" y2="0.94">
-      <stop offset="0" stop-color="#1c1e24" stop-opacity="0.96"/>
-      <stop offset="0.58" stop-color="#1c1e24"/>
-      <stop offset="1" stop-color="#1c1e24" stop-opacity="0.82"/>
-    </linearGradient>
-    <linearGradient id="glint" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.92"/>
-      <stop offset="0.55" stop-color="#FFFFFF" stop-opacity="0.38"/>
-      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.02"/>
-    </linearGradient>
-  </defs>
-  <g clip-path="url(#rounded)">
-    <rect fill="url(#paper)" height="1024" width="1024" x="0" y="0"/>
-    <!-- 墨滴取自 weimo-logo.svg（512 视框），×1.8 放大后居中 -->
-    <g transform="translate(51.2 42.2) scale(1.8)">
-      <path fill="url(#inkTone)" d="M256 54
-        C241 111 220 153 184 202
-        C148 251 119 291 119 343
-        C119 421 178 468 256 468
-        C334 468 393 421 393 343
-        C393 291 364 251 328 202
-        C292 153 271 111 256 54 Z"/>
-      <path fill="url(#glint)" d="M246 112
-        C233 157 213 192 187 231
-        C163 267 151 295 151 323
-        C151 341 157 354 168 361
-        C179 368 190 357 195 340
-        C204 309 220 279 240 247
-        C259 217 266 181 246 112 Z"/>
-    </g>
+  <g transform="translate(51.2 42.2) scale(1.8)">
+    <path fill="#FFFFFF" d="M256 54
+      C241 111 220 153 184 202
+      C148 251 119 291 119 343
+      C119 421 178 468 256 468
+      C334 468 393 421 393 343
+      C393 291 364 251 328 202
+      C292 153 271 111 256 54 Z"/>
   </g>
 </svg>
