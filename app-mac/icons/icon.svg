@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="微墨·豆瓣原生版 App 图标">
+  <!-- app-mac 原生版应用图标：与 Tauri 版（app/icons/icon.svg）同源同构，
+       仅把宣纸底换成浅蓝底——两版并行调试时 Dock/Cmd+Tab/关于面板一眼可辨。
+       再生：rsvg-convert -w 1024 -h 1024 icon.svg -o icon-1024.png 后经
+       scripts/make-icns.sh 产出 icon.icns（build-app.sh 组装时拷入 bundle）。
+       墨滴与高光路径原样取自 Tauri 版源稿。 -->
+  <defs>
+    <radialGradient id="paper" cx="0.5" cy="0.42" r="0.85">
+      <stop offset="0" stop-color="#dceefc"/>
+      <stop offset="0.7" stop-color="#cfe7fa"/>
+      <stop offset="1" stop-color="#b8daf5"/>
+    </radialGradient>
+    <linearGradient id="inkTone" x1="0.18" y1="0.08" x2="0.82" y2="0.94">
+      <stop offset="0" stop-color="#1c1e24" stop-opacity="0.96"/>
+      <stop offset="0.58" stop-color="#1c1e24"/>
+      <stop offset="1" stop-color="#1c1e24" stop-opacity="0.82"/>
+    </linearGradient>
+    <linearGradient id="glint" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.92"/>
+      <stop offset="0.55" stop-color="#FFFFFF" stop-opacity="0.38"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.02"/>
+    </linearGradient>
+  </defs>
+  <rect fill="url(#paper)" height="1024" width="1024" x="0" y="0"/>
+  <!-- 墨滴取自 weimo-logo.svg（512 视框），×1.8 放大后居中 -->
+  <g transform="translate(51.2 42.2) scale(1.8)">
+    <path fill="url(#inkTone)" d="M256 54
+      C241 111 220 153 184 202
+      C148 251 119 291 119 343
+      C119 421 178 468 256 468
+      C334 468 393 421 393 343
+      C393 291 364 251 328 202
+      C292 153 271 111 256 54 Z"/>
+    <path fill="url(#glint)" d="M246 112
+      C233 157 213 192 187 231
+      C163 267 151 295 151 323
+      C151 341 157 354 168 361
+      C179 368 190 357 195 340
+      C204 309 220 279 240 247
+      C259 217 266 181 246 112 Z"/>
+  </g>
+</svg>

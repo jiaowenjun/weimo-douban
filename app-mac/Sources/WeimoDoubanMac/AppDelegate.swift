@@ -11,15 +11,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var windowController: MainWindowController?
     private var syncMonitor: SyncMonitor?
 
-    // 托盘菜单项引用（状态行文本刷新 / 立即同步禁用态 / 自启开关态）
+    // 托盘菜单项引用（状态行文本刷新 / 立即同步禁用态）
     private var statusLineItem: NSMenuItem?
     private var syncNowItem: NSMenuItem?
-    private var launchAtLoginItem: NSMenuItem?
-    private var hotKeyItem: NSMenuItem?
 
-    // 全局快捷键（路线图 1.5）：⌘⇧M 唤起/收起，托盘菜单可重录
+    // 全局快捷键（路线图 1.5）：⌘⇧M 唤起/收起，偏好窗可重录
     private let hotKey = HotKeyCenter()
-    private var hotKeyRecorder: HotKeyRecorder?
+
+    /// 壳设置原生偏好窗（⌘,/Dock/托盘三入口）：自启开关、热键录制、数据
+    /// 文件夹——托盘随之瘦身；内容偏好（卡片显示）留 web 弹层
+    private lazy var preferences = PreferencesWindowController(
+        hotKey: hotKey,
+        shouldDropToAccessory: { [weak self] in
+            self?.windowController?.isWindowVisible != true
+        })
 
     /// 进程存活期的强引用兜底：NSApplication.delegate 为弱引用，main.swift
     /// 闭包局部变量在 release 优化下理论上可能被提前释放——静态持有杜绝整
@@ -78,6 +83,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         showMainWindow()
         return true
+    }
+
+    /// Dock 右键菜单（.regular 窗口期可见）
+    func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
+        let menu = NSMenu()
+        let open = NSMenuItem(title: "打开主窗口", action: #selector(showMainWindow), keyEquivalent: "")
+        open.target = self
+        menu.addItem(open)
+        let prefs = NSMenuItem(title: "偏好设置…", action: #selector(showPreferences), keyEquivalent: "")
+        prefs.target = self
+        menu.addItem(prefs)
+        return menu
     }
 
     // MARK: - 启动装配
@@ -153,6 +170,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             withTitle: "关于微墨·豆瓣", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)),
             keyEquivalent: "")
         appMenu.addItem(.separator())
+        let preferencesItem = NSMenuItem(
+            title: "偏好设置…", action: #selector(showPreferences), keyEquivalent: ",")
+        preferencesItem.keyEquivalentModifierMask = .command
+        appMenu.addItem(preferencesItem)
+        appMenu.addItem(.separator())
         appMenu.addItem(
             withTitle: "隐藏微墨·豆瓣", action: #selector(NSApplication.hide(_:)),
             keyEquivalent: "h")
@@ -193,11 +215,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         open.keyEquivalentModifierMask = .command
         menu.addItem(open)
 
-        let hotKeyItem = NSMenuItem(title: "唤起快捷键：\(hotKey.displayCombo)…", action: #selector(hotKeyTapped), keyEquivalent: "")
-        hotKeyItem.target = self
-        menu.addItem(hotKeyItem)
-        self.hotKeyItem = hotKeyItem
-
         let statusLine = NSMenuItem(title: "状态：启动中…", action: nil, keyEquivalent: "")
         statusLine.isEnabled = false
         menu.addItem(statusLine)
@@ -215,11 +232,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         menu.addItem(.separator())
 
-        let launch = NSMenuItem(title: "开机自动启动", action: #selector(toggleLaunchAtLoginTapped), keyEquivalent: "")
-        launch.target = self
-        launch.state = ShellSupport.launchAtLoginEnabled ? .on : .off
-        menu.addItem(launch)
-        launchAtLoginItem = launch
+        let prefs = NSMenuItem(title: "偏好设置…", action: #selector(showPreferences), keyEquivalent: ",")
+        prefs.target = self
+        prefs.keyEquivalentModifierMask = .command
+        menu.addItem(prefs)
 
         let github = NSMenuItem(title: "GitHub 仓库", action: #selector(openGitHubTapped), keyEquivalent: "")
         github.target = self
@@ -269,24 +285,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    /// 托盘菜单「唤起快捷键」：打开录制面板换绑
-    @objc private func hotKeyTapped() {
-        let recorder = HotKeyRecorder(currentCombo: hotKey.displayCombo)
-        recorder.onRecord = { [weak self] keyCode, modifiers, display in
-            guard let self else { return }
-            if self.hotKey.update(keyCode: keyCode, modifiers: modifiers, display: display) {
-                self.hotKeyItem?.title = "唤起快捷键：\(self.hotKey.displayCombo)…"
-            } else {
-                self.alert("组合 \(self.hotKey.displayCombo) 注册失败（可能被其他 App 占用），请换一个")
-            }
-        }
-        recorder.onRestoreDefault = { [weak self] in
-            guard let self else { return }
-            self.hotKey.restoreDefault()
-            self.hotKeyItem?.title = "唤起快捷键：\(self.hotKey.displayCombo)…"
-        }
-        recorder.onClose = { [weak self] in self?.hotKeyRecorder = nil }
-        hotKeyRecorder = recorder
+    /// 偏好设置窗（⌘, / Dock 菜单 / 托盘菜单三入口收敛于此）
+    @objc private func showPreferences() {
+        preferences.show()
     }
 
     @objc private func syncNowTapped() {
@@ -304,13 +305,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func openDataFolderTapped() {
         ShellSupport.revealDataDir()
-    }
-
-    @objc private func toggleLaunchAtLoginTapped() {
-        let target = !ShellSupport.launchAtLoginEnabled
-        if ShellSupport.setLaunchAtLogin(target) {
-            launchAtLoginItem?.state = target ? .on : .off
-        }
     }
 
     @objc private func openGitHubTapped() {

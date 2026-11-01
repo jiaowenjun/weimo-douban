@@ -217,6 +217,11 @@ final class MainWindowController: NSObject, NSWindowDelegate, WKNavigationDelega
         window.isVisible && window.isKeyWindow && NSApp.isActive
     }
 
+    /// 纯可见性（偏好窗关窗后判断是否降回纯托盘用）
+    var isWindowVisible: Bool {
+        window.isVisible
+    }
+
     // MARK: NSWindowDelegate —— 关窗 = 收起到托盘（Dock 图标随降回 accessory 消失）
 
     func windowShouldClose(_ sender: NSWindow) -> Bool {

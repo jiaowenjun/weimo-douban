@@ -12,13 +12,13 @@ cargo build --release --manifest-path server/Cargo.toml
 # 3) Swift 原生壳（release）
 swift build -c release
 
-# 4) 组装 bundle（图标复用 Tauri 版资产，只读不改）
+# 4) 组装 bundle（app 图标=app-mac 自持浅蓝变体区分 Tauri 版；托盘墨滴仍复用 Tauri 版资产只读）
 APP="build/WeimoDoubanNative.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp .build/release/WeimoDoubanMac "$APP/Contents/MacOS/WeimoDoubanMac"
 cp server/target/release/weimo-douban-mac-server "$APP/Contents/Resources/weimo-douban-mac-server"
-cp ../app/icons/icon.icns "$APP/Contents/Resources/icon.icns"
+cp icons/icon.icns "$APP/Contents/Resources/icon.icns"
 cp ../app/icons/tray-icon.png "$APP/Contents/Resources/tray-icon.png"
 cp Info.plist "$APP/Contents/Info.plist"
 

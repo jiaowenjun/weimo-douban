@@ -65,9 +65,16 @@ WeimoDoubanNative.app（单进程 + sidecar）
   同端点同口径——任务 `queued/running → completed/partial/failed` 跃迁、
   `subjects_pending >0 → 0` 跃迁发系统通知，点击唤起主窗口；首帧只建
   基线不回放历史。dev 直跑（无 bundle id）通知降级为日志。
-- **托盘菜单**：打开主窗口 / 唤起快捷键（录制面板）/ 状态行（同步中 P% ·
-  详情拉取中 N 条 · 空闲）/ 立即同步（全部已登记用户 POST）/ 打开数据文件夹 /
-  开机自启（SMAppService）/ GitHub 仓库 / 退出。
+- **托盘菜单**：打开主窗口 / 状态行（同步中 P% · 详情拉取中 N 条 · 空闲）/
+  立即同步（全部已登记用户 POST）/ 打开数据文件夹 / 偏好设置… / GitHub
+  仓库 / 退出。
+- **壳设置原生偏好窗**（控件原生化第一件）：⌘,（应用菜单）/ Dock 右键
+  菜单 / 托盘三入口的标准偏好窗口——开机自启 NSSwitch、全局唤起快捷键
+  录制（复用 HotKeyRecorder 浮层）、数据文件夹入口；混合形态协同（窗开
+  .regular，关窗且主窗不可见则降回 accessory）。**内容偏好（卡片显示两
+  项）刻意留 web 弹层**：状态由 React 持有（localStorage），原生写不进去
+  （只能 reload 生效）且 web 端同款弹层必须保留——双编辑器漂移税不值；
+  控件原生的正确姿势是把「壳职能」界面原生出，而非给 web 控件换皮。
 - **全局快捷键**（路线图 1.5）：Carbon `RegisterEventHotKey`（非沙盒系统级
   热键标准通道），默认 ⌘⇧M 唤起/收起主窗口（App 前台且窗口可见时热键=收起，
   Raycast 式 toggle）；组合经托盘菜单录制面板重录，UserDefaults 持久化，
