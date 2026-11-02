@@ -1,7 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="微墨·豆瓣 App 图标">
   <!-- 微墨·豆瓣 应用图标源稿：宣纸底 + 浓墨滴（全出血方形，macOS 系统自动切圆角）。
        再生方式：rsvg-convert -w 1024 -h 1024 icon.svg -o app-icon.png 后在 app/ 目录
-       执行 pnpm tauri icon app-icon.png（全套尺寸与 icns/ico 重生成落 icons/） -->
+       执行 pnpm tauri icon app-icon.png（全套尺寸与 icns/ico 重生成落 icons/）。
+       注意：icon.ico 的再生产物是直角方形——Windows 版圆角 ico 由 icon-windows.svg
+       单独再生（见该文件注释），跑完 tauri icon 后须重打 Windows 圆角 ico -->
   <defs>
     <radialGradient id="paper" cx="0.5" cy="0.42" r="0.85">
       <stop offset="0" stop-color="#f8f4ec"/>

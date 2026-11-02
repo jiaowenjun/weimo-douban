@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="微墨·豆瓣 Windows 图标">
+  <!-- 微墨·豆瓣 Windows 专用图标源稿：与 icon.svg 同稿（宣纸底+浓墨滴），但自带
+       22.5% 圆角裁切（rx=230.4，四角透明）。Windows 任务栏/桌面/资源管理器对
+       .ico 原样显示像素、无系统圆角蒙版（macOS 靠系统蒙版把满出血 icns 切成
+       squircle），故 Windows 版圆角必须烤进 ico；口径与托盘旧稿/welcome-page
+       对 app-icon 的 css 圆角一致。mac 资产（icon.icns/icon.png 满出血）不动。
+       再生方式：rsvg-convert -w N -h N icon-windows.svg 逐尺寸出 PNG
+       （N=16/24/32/48/64/256，与 pnpm tauri icon 生成的 icon.ico 条目集一致），
+       再以 Pillow 按 PNG 条目打包回 icons/icon.ico（勿跑 pnpm tauri icon，
+       会以满出血方形源稿覆盖回直角 ico） -->
+  <defs>
+    <clipPath id="rounded">
+      <rect width="1024" height="1024" rx="230.4"/>
+    </clipPath>
+    <radialGradient id="paper" cx="0.5" cy="0.42" r="0.85">
+      <stop offset="0" stop-color="#f8f4ec"/>
+      <stop offset="0.7" stop-color="#f5f0e6"/>
+      <stop offset="1" stop-color="#efe8da"/>
+    </radialGradient>
+    <linearGradient id="inkTone" x1="0.18" y1="0.08" x2="0.82" y2="0.94">
+      <stop offset="0" stop-color="#1c1e24" stop-opacity="0.96"/>
+      <stop offset="0.58" stop-color="#1c1e24"/>
+      <stop offset="1" stop-color="#1c1e24" stop-opacity="0.82"/>
+    </linearGradient>
+    <linearGradient id="glint" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.92"/>
+      <stop offset="0.55" stop-color="#FFFFFF" stop-opacity="0.38"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.02"/>
+    </linearGradient>
+  </defs>
+  <g clip-path="url(#rounded)">
+    <rect fill="url(#paper)" height="1024" width="1024" x="0" y="0"/>
+    <!-- 墨滴取自 weimo-logo.svg（512 视框），×1.8 放大后居中 -->
+    <g transform="translate(51.2 42.2) scale(1.8)">
+      <path fill="url(#inkTone)" d="M256 54
+        C241 111 220 153 184 202
+        C148 251 119 291 119 343
+        C119 421 178 468 256 468
+        C334 468 393 421 393 343
+        C393 291 364 251 328 202
+        C292 153 271 111 256 54 Z"/>
+      <path fill="url(#glint)" d="M246 112
+        C233 157 213 192 187 231
+        C163 267 151 295 151 323
+        C151 341 157 354 168 361
+        C179 368 190 357 195 340
+        C204 309 220 279 240 247
+        C259 217 266 181 246 112 Z"/>
+    </g>
+  </g>
+</svg>
