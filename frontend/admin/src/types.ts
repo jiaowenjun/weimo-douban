@@ -296,3 +296,78 @@ export interface UserSummary {
 export interface UserListResponse {
   users: UserSummary[];
 }
+
+export interface EnrichmentCategory {
+  category: string;
+  paused: boolean;
+  category_paused: boolean;
+  global_paused: boolean;
+  blocked_until_ms: number;
+  next_request_ms: number;
+  interval_secs: number | null;
+  floor_secs: number;
+  pending: number;
+  running: number;
+  first_waiting: number;
+  retry_waiting: number;
+  retry_due: number;
+  retry_wait_ms: number | null;
+  dispatch_delay_ms: number | null;
+  errors: number;
+  not_found: number;
+  history: { outcome: string; http_status: number | null; recovered: boolean; count: number }[];
+  last_hour: { attempts: number; successes: number; http_400: number };
+}
+export interface EnrichmentOverview {
+  enabled: boolean;
+  now_ms: number;
+  history_since_ms: number | null;
+  categories: EnrichmentCategory[];
+  coverage: {
+    uid: string;
+    category: string;
+    total: number;
+    enriched: number;
+    fallback: number;
+    missing: number;
+    queued: number;
+    unqueued: number;
+    subscribed: boolean;
+    next_full_ms: number | null;
+  }[];
+  operations: {
+    id: string;
+    kind: string;
+    category: string;
+    created_ms: number;
+    restored_ms: number | null;
+    counts: {
+      deleted?: number;
+      retrying?: number;
+      running?: number;
+      restored?: number;
+      queued?: number;
+      in_flight?: number;
+    };
+  }[];
+}
+
+export interface EnrichmentAttempt {
+  id: number;
+  category: string;
+  subject_id: string;
+  attempt: number;
+  started_ms: number;
+  finished_ms: number | null;
+  outcome: string;
+  error_code: string | null;
+  http_status: number | null;
+  error: string | null;
+  recovered: boolean;
+}
+export interface EnrichmentHistory {
+  items: EnrichmentAttempt[];
+  total: number;
+  page: number;
+  page_size: number;
+}

@@ -1,4 +1,6 @@
 import type {
+  EnrichmentOverview,
+  EnrichmentHistory,
   CreateTaskBody,
   CreateTaskResponse,
   MarksResponse,
@@ -100,7 +102,9 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
 
 /** /healthz 不在 /api/v1 前缀下，不能走 request()（它会再拼一次 base） */
 export const health = async () => {
-  const origin = getApiBase().replace(/\/api\/v1\/?$/, '').replace(/\/$/, '');
+  const origin = getApiBase()
+    .replace(/\/api\/v1\/?$/, '')
+    .replace(/\/$/, '');
   const res = await fetch(origin + '/healthz', { headers: authHeaders() });
   if (!res.ok) throw await parseError(res);
   return (await res.json()) as { status: string };
@@ -206,12 +210,36 @@ export const api = {
       { method: 'DELETE' },
     ),
 
+  enrichmentHistory: (category: string, subjectId: string, page: number) => {
+    const q = new URLSearchParams({
+      category,
+      subject_id: subjectId,
+      page: String(page),
+      page_size: '10',
+    });
+    return request<EnrichmentHistory>(`/subjects/jobs/history?${q}`);
+  },
+  enrichmentOverview: () => request<EnrichmentOverview>('/subjects/jobs/overview'),
+  controlEnrichment: (paused: boolean, category = 'all') =>
+    request<{ in_flight: number }>('/subjects/jobs/control', {
+      method: 'POST',
+      body: JSON.stringify({ paused, category }),
+    }),
+  restoreEnrichment: (id: string) =>
+    request<{ restored: number; in_flight?: number }>(
+      `/subjects/jobs/restore/${encodeURIComponent(id)}`,
+      { method: 'POST' },
+    ),
+
   /** 按状态批量删除任务；中断队列 = states ['queued','running'] */
   clearSubjectJobs: (body: { states: string[]; category?: string }) =>
-    request<{ deleted: number }>('/subjects/jobs/clear', {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }),
+    request<{ deleted: number; retrying: number; in_flight: number; operation_id: string }>(
+      '/subjects/jobs/clear',
+      {
+        method: 'POST',
+        body: JSON.stringify(body),
+      },
+    ),
 
   /** 批量重排：failed（重试失败终态）/ not_found（重试已删除条目）/ stale（强制重抓过期条目） */
   requeueSubjectJobs: (scope: 'failed' | 'not_found' | 'stale', category?: string) =>
@@ -226,10 +254,12 @@ export const api = {
   /** 全用户列表（users ∪ records ∪ subscriptions ∪ tasks 四表并集，按记录数降序） */
   listUsers: () => request<UserListResponse>('/users'),
 
-  listSubscriptions: () =>
-    request<SubscriptionListResponse>('/subscriptions'),
+  listSubscriptions: () => request<SubscriptionListResponse>('/subscriptions'),
 
-  createSubscription: (uid: string, body: { rss_interval_secs?: number; full_interval_secs?: number }) =>
+  createSubscription: (
+    uid: string,
+    body: { rss_interval_secs?: number; full_interval_secs?: number },
+  ) =>
     request<Subscription>(`/subscriptions/${encodeURIComponent(uid)}`, {
       method: 'PUT',
       body: JSON.stringify(body),

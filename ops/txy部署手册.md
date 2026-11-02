@@ -523,6 +523,7 @@ curl -fsSL "https://gitee.com/jiaowenjun/weimo-douban/raw/app-latest/latest.json
 
 - 日志：`journalctl -u weimo-douban -f`；同步任务记录在 db 的 records 表（保留 30 天，`SYNC_TASK_RETENTION_DAYS`）。
 - 抓取行为调优（douban 独有，按需经 env 覆盖）：`SYNC_RATE_PER_MINUTE`、`SYNC_CRAWL_MIN_INTERVAL_SECS`、`SYNC_SUBJECT_*` 系列（豆瓣 rexxar 限流敏感，见《豆瓣源依赖性与脆弱性分析.md》）。
+- 富集运维（2026-11-02）：优先使用后台的“暂停/恢复”保留队列；“清空”会保存可恢复快照。缺口归属、历史恢复记录、类别限速配置与实验步骤见[富集任务可靠性与调度](../docs/design/富集任务可靠性与调度.md)。升级不会自动补回之前已删除的任务。
 - **`SYNC_RATE_PER_MINUTE` 勿设低于 ~200**（2026-11-01 实测教训）：默认已从 60 提至 300——首发同步高峰（3s 版本轮询 + 每页直写/每条富集落库触发 dims/marks/stats 全家重拉，封面端点豁免不计）峰值 ~140/min，60/分钟的旧默认会把合法用户同步期间打出 429，表现为侧边栏「筛选数据暂不可用」闪现（前端已把 429 归瞬态自动恢复，限流余量仍应给足）；douban.env 若显式设了低值需同步上调。
 - 迁移完成后，本地 `backend/data` 不再是生产数据源；本地开发继续用本地副本，两边数据各自演化，**不要**再双向 rsync。
 

@@ -39,6 +39,18 @@ pub async fn run_worker<F: DoubanFetcher>(state: AppState, fetcher: F) {
             continue;
         }
 
+        // Subject results commit before pacing; only the shared minimum gates all requests.
+        // Category-specific deadlines leave other categories available to the same worker.
+        let global_delay = super::subject_queue::global_delay_ms(&state.pool)
+            .await
+            .unwrap_or(1000);
+        if global_delay > 0 {
+            tokio::select! {
+                _ = tokio::time::sleep(Duration::from_millis(global_delay.min(60_000) as u64)) => {},
+                _ = wakeup.changed() => {},
+            }
+            continue;
+        }
         match process_next_due(&state, &fetcher).await {
             Ok(true) => {} // 处理了一个维度，立即取下一个
             Ok(false) => {
@@ -64,10 +76,13 @@ pub async fn run_worker<F: DoubanFetcher>(state: AppState, fetcher: F) {
                 .fetch_one(&state.pool)
                 .await
                 .unwrap_or(None);
-                let idle_scan = lease_until
+                let mut idle_scan = lease_until
                     .map(|until| Duration::from_millis((until - now).max(1) as u64))
                     .unwrap_or(IDLE_SCAN)
                     .min(IDLE_SCAN);
+                if let Ok(Some(delay)) = super::subject_queue::next_delay_ms(&state).await {
+                    idle_scan = idle_scan.min(Duration::from_millis(delay as u64));
+                }
                 tokio::select! {
                     changed = wakeup.changed() => {
                         if changed.is_err() {

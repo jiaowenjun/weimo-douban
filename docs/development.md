@@ -58,6 +58,7 @@ curl -H 'Authorization: Bearer replace-with-your-token' \
 - [服务器 API 设计](design/服务器API设计.md)
 - [缓存与同步策略](design/缓存与同步策略.md)
 - [条目元信息富集](design/条目元信息富集方案.md)
+- [富集任务可靠性、暂停恢复与调度](design/富集任务可靠性与调度.md)
 - [中心详情缓存](design/中心条目缓存接入方案.md)
 - [mac 原生迁移路线图](design/tauri_app_mac_原生渐进式迁移路线图.md)
 

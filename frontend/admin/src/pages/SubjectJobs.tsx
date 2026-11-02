@@ -25,9 +25,15 @@ import {
   SearchOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
-import type { SubjectJob, SubjectJobListResponse, SubjectJobState } from '../types';
+import type {
+  EnrichmentOverview as Overview,
+  SubjectJob,
+  SubjectJobListResponse,
+  SubjectJobState,
+} from '../types';
 import { api, resolveApiUrl, type ApiError } from '../api';
 import { CATEGORY_OPTIONS } from '../labels';
+import EnrichmentOverview from './EnrichmentOverview';
 
 const PAGE_SIZE = 20;
 
@@ -61,9 +67,11 @@ function StatsCard({
   onInterrupt,
   onRequeue,
   onClearOk,
+  retrying,
 }: {
   counts: SubjectJobListResponse['counts'] | null;
   busy: string | null;
+  retrying: number;
   onInterrupt: () => void;
   onRequeue: (scope: 'failed' | 'not_found' | 'stale') => void;
   onClearOk: () => void;
@@ -76,7 +84,7 @@ function StatsCard({
           title="待执行"
           value={pending}
           valueStyle={{ fontSize: 20 }}
-          prefix={pending > 0 ? <Tag color="processing">worker 空闲时段串行抓取</Tag> : undefined}
+          prefix={retrying > 0 ? <Tag color="gold">含 {retrying} 条重试</Tag> : undefined}
         />
         <Statistic title="已完成" value={counts?.ok ?? '—'} valueStyle={{ fontSize: 20 }} />
         <Statistic
@@ -85,17 +93,26 @@ function StatsCard({
           valueStyle={{ fontSize: 20 }}
           prefix={counts && counts.error > 0 ? <Tag color="error">error</Tag> : undefined}
         />
-        <Statistic title="条目已删除" value={counts?.not_found ?? '—'} valueStyle={{ fontSize: 20 }} />
+        <Statistic
+          title="条目已删除"
+          value={counts?.not_found ?? '—'}
+          valueStyle={{ fontSize: 20 }}
+        />
         <Popconfirm
-          title="中断富集队列"
-          description={`将删除全部 ${pending} 个待执行任务（正在抓取的一条会完成但不影响数据）；已完成的条目缓存不受影响`}
-          okText="中断"
+          title="清空全部待执行任务"
+          description={`当前共 ${pending} 条，其中 ${retrying} 条等待重试。删除前保存快照，可在操作记录中恢复；在途请求允许结束。如需暂时停止，请使用暂停。`}
+          okText="保存快照并清空"
           okButtonProps={{ danger: true }}
           onConfirm={onInterrupt}
           disabled={pending === 0}
         >
-          <Button danger icon={<PauseCircleOutlined />} disabled={pending === 0} loading={busy === 'interrupt'}>
-            中断队列
+          <Button
+            danger
+            icon={<PauseCircleOutlined />}
+            disabled={pending === 0}
+            loading={busy === 'interrupt'}
+          >
+            清空待执行
           </Button>
         </Popconfirm>
         <Tooltip title="重试全部失败终态的任务（error）">
@@ -118,7 +135,11 @@ function StatsCard({
           </Button>
         </Tooltip>
         <Tooltip title="强制重抓库中已过 TTL 的条目——「重新抓取已有条目」的唯一批量入口">
-          <Button icon={<ReloadOutlined />} loading={busy === 'stale'} onClick={() => onRequeue('stale')}>
+          <Button
+            icon={<ReloadOutlined />}
+            loading={busy === 'stale'}
+            onClick={() => onRequeue('stale')}
+          >
             重抓过期
           </Button>
         </Tooltip>
@@ -146,6 +167,7 @@ export default function SubjectJobs() {
   const [q, setQ] = useState('');
   const [page, setPage] = useState(1);
   const [data, setData] = useState<SubjectJobListResponse | null>(null);
+  const [overview, setOverview] = useState<Overview | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -155,7 +177,12 @@ export default function SubjectJobs() {
     setLoading(true);
     try {
       const state = STATE_TABS.find((t) => t.key === tab)?.state;
-      setData(await api.listSubjectJobs({ state, category, q, page, pageSize: PAGE_SIZE }));
+      const [jobs, summary] = await Promise.all([
+        api.listSubjectJobs({ state, category, q, page, pageSize: PAGE_SIZE }),
+        api.enrichmentOverview(),
+      ]);
+      setData(jobs);
+      setOverview(summary);
       setError(null);
     } catch (e) {
       setData(null);
@@ -191,10 +218,32 @@ export default function SubjectJobs() {
     }
   };
 
+  const onControl = (action: 'pause' | 'resume' | 'restore' | 'backfill', value?: string) =>
+    after(action, async () => {
+      if (action === 'restore') {
+        const r = await api.restoreEnrichment(value!);
+        message.success(
+          `已恢复 ${r.restored} 条任务${r.in_flight ? `；${r.in_flight} 条仍在执行，可稍后再恢复` : ''}`,
+        );
+      } else if (action === 'backfill') {
+        const r = await api.backfillSubjects();
+        message.success(`已补回 ${r.queued_jobs} 条缺失任务`);
+      } else {
+        const r = await api.controlEnrichment(action === 'pause', value);
+        message.success(
+          action === 'pause'
+            ? `已暂停；${r.in_flight} 条在途请求允许结束`
+            : '已恢复，仍遵守类别冷却',
+        );
+      }
+    });
+
   const onInterrupt = () =>
     after('interrupt', async () => {
       const r = await api.clearSubjectJobs({ states: ['queued', 'running'], category: 'all' });
-      message.success(`已中断富集队列，删除 ${r.deleted} 个待执行任务`);
+      message.success(
+        `已保存快照并删除 ${r.deleted} 条，其中 ${r.retrying} 条等待重试；${r.in_flight} 条在途请求允许结束`,
+      );
     });
 
   const onRequeue = (scope: 'failed' | 'not_found' | 'stale') =>
@@ -248,7 +297,7 @@ export default function SubjectJobs() {
   return (
     <PageContainer
       title="富集任务"
-      subTitle="rexxar 富集队列管理：worker 空闲时段串行执行；库中已有的条目不重复请求，重抓需显式触发"
+      subTitle="结构化元信息富集与任务管理"
     >
       {error && (
         <Alert
@@ -264,8 +313,10 @@ export default function SubjectJobs() {
         />
       )}
 
+      <EnrichmentOverview data={overview} busy={busy !== null} act={onControl} />
       <StatsCard
         counts={counts}
+        retrying={overview?.categories.reduce((n, c) => n + c.retry_waiting, 0) ?? 0}
         busy={busy}
         onInterrupt={onInterrupt}
         onRequeue={onRequeue}
@@ -321,6 +372,7 @@ export default function SubjectJobs() {
 
       <Table<SubjectJob>
         size="small"
+        scroll={{ x: 1200 }}
         rowKey={(j) => `${j.category}/${j.subject_id}`}
         loading={loading}
         dataSource={data?.items ?? []}
@@ -355,12 +407,11 @@ export default function SubjectJobs() {
           {
             title: '条目',
             dataIndex: 'title',
+            width: 260,
             render: (_, j) => (
               <>
                 <div>
-                  {j.title ?? (
-                    <Typography.Text type="secondary">（未富集）</Typography.Text>
-                  )}{' '}
+                  {j.title ?? <Typography.Text type="secondary">（未富集）</Typography.Text>}{' '}
                   <Tag style={{ marginRight: 0 }}>
                     {CATEGORY_OPTIONS.find((c) => c.value === j.category)?.label}
                   </Tag>{' '}
@@ -377,7 +428,15 @@ export default function SubjectJobs() {
             title: '状态',
             dataIndex: 'state',
             width: 100,
-            render: (s: SubjectJobState) => stateTag(s),
+            render: (s: SubjectJobState, j) => {
+              const policy = overview?.categories.find((c) => c.category === j.category);
+              if (s === 'queued' && policy?.paused)
+                return <Tag>已暂停{j.attempts > 0 ? ' · 待重试' : ''}</Tag>;
+              if (s === 'queued' && j.attempts > 0) return <Tag color="gold">等待重试</Tag>;
+              if (s === 'queued' && policy && policy.blocked_until_ms > overview!.now_ms)
+                return <Tag color="gold">类别冷却</Tag>;
+              return stateTag(s);
+            },
           },
           {
             title: '尝试',
@@ -389,7 +448,14 @@ export default function SubjectJobs() {
             title: '下次执行 / 抓取于',
             width: 150,
             render: (_, j) => {
-              const v = j.state === 'queued' || j.state === 'running' ? j.next_run_at : j.fetched_at;
+              const policy = overview?.categories.find((c) => c.category === j.category);
+              const v =
+                j.state === 'queued' || j.state === 'running'
+                  ? Math.max(
+                      j.next_run_at ? dayjs(j.next_run_at).valueOf() : 0,
+                      policy?.next_request_ms ?? 0,
+                    )
+                  : j.fetched_at;
               return v ? (
                 <span style={{ color: token.colorTextDescription }}>
                   {dayjs(v).format('YYYY-MM-DD HH:mm')}
@@ -413,10 +479,14 @@ export default function SubjectJobs() {
             title: '错误',
             dataIndex: 'last_error',
             ellipsis: true,
-            render: (v: string | null) =>
+            render: (v: string | null, j) =>
               v ? (
                 <Tooltip title={v}>
-                  <Typography.Text type="danger" style={{ fontSize: 12 }} ellipsis>
+                  <Typography.Text
+                    type={j.state === 'queued' || j.state === 'running' ? 'warning' : 'danger'}
+                    style={{ fontSize: 12 }}
+                    ellipsis
+                  >
                     {v}
                   </Typography.Text>
                 </Tooltip>
@@ -455,7 +525,7 @@ export default function SubjectJobs() {
       />
       {data && data.counts.queued + data.counts.running > 0 && (
         <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-          队列抓取中，每 5 秒自动刷新；中断队列可随时停止剩余任务
+          队列每 5 秒自动刷新；暂停保留进度，清空保存快照。恢复和强制重排均遵守暂停与类别冷却。
         </Typography.Text>
       )}
     </PageContainer>

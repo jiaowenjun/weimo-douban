@@ -194,36 +194,60 @@ pub async fn enqueue_missing_subjects(pool: &SqlitePool, uid: &str, category: &s
 /// 存量回填：对 records 里出现的每个 (uid, category) 逐个跑集合差（幂等）。
 /// 返回 (新排入 job 数, 覆盖的 uid×类别对数)。
 pub async fn backfill(pool: &SqlitePool) -> Result<(u64, usize)> {
-    let pairs = sqlx::query("SELECT DISTINCT uid, category FROM records ORDER BY uid, category")
-        .fetch_all(pool)
-        .await
-        .context("回填读取 records 失败")?;
-    let mut queued = 0u64;
-    for row in &pairs {
-        let uid: String = row.get("uid");
-        let category: String = row.get("category");
-        queued += enqueue_missing_subjects(pool, &uid, &category).await?;
-    }
-    Ok((queued, pairs.len()))
+    let mut tx = pool.begin_with("BEGIN IMMEDIATE").await?;
+    let pairs: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM (SELECT DISTINCT uid,category FROM records)")
+            .fetch_one(&mut *tx)
+            .await?;
+    let now = ServerConfig::now_ms();
+    let queued=sqlx::query("INSERT OR IGNORE INTO subject_jobs(category,subject_id,created_ms,updated_ms)
+        SELECT DISTINCT r.category,r.subject_id,?,? FROM records r LEFT JOIN subjects s USING(category,subject_id) WHERE s.subject_id IS NULL")
+        .bind(now).bind(now).execute(&mut *tx).await?.rows_affected();
+    let id = super::subject_queue::operation_id();
+    super::subject_queue::audit(
+        &mut tx,
+        &id,
+        "backfill",
+        "*",
+        &json!({}),
+        &json!({"queued":queued}),
+    )
+    .await?;
+    tx.commit().await?;
+    tracing::info!(operation_id=%id,queued,"enrichment backfill queued");
+    Ok((queued, pairs as usize))
 }
 
 /// 强制刷新单个条目：无视 TTL 重新排队（priority=0 优先执行）
 pub async fn force_refresh(pool: &SqlitePool, category: &str, subject_id: &str) -> Result<()> {
     let now = ServerConfig::now_ms();
+    let mut tx = pool.begin_with("BEGIN IMMEDIATE").await?;
     sqlx::query(
         "INSERT INTO subject_jobs (category, subject_id, state, priority, created_ms, updated_ms)
          VALUES (?, ?, 'queued', 0, ?, ?)
          ON CONFLICT(category, subject_id) DO UPDATE SET
             state = 'queued', attempts = 0, next_run_ms = NULL,
-            priority = 0, updated_ms = excluded.updated_ms",
+            last_error=NULL, retry_since_ms=NULL, run_token=NULL, priority = 0, updated_ms = excluded.updated_ms",
     )
     .bind(category)
     .bind(subject_id)
     .bind(now)
     .bind(now)
-    .execute(pool)
+    .execute(&mut *tx)
     .await
     .context("条目刷新入队失败")?;
+    let id = super::subject_queue::operation_id();
+    super::subject_queue::audit(
+        &mut tx,
+        &id,
+        "refresh",
+        category,
+        &json!({"subject_id":subject_id}),
+        &json!({"queued":1}),
+    )
+    .await?;
+    tx.commit().await?;
+    tracing::info!(operation_id=%id,category,subject_id,"enrichment refresh queued");
     Ok(())
 }
 
@@ -236,283 +260,275 @@ struct SubjectJob {
     subject_id: String,
     attempts: i64,
     priority: i64,
+    run_token: String,
 }
 
-/// 处理一个到期富集 job；返回是否处理了（供 worker 循环与测试复用）。
-/// 维度队列优先，本方法只在 worker 空闲时段被调用。
+/// Claim under a write transaction: pause, cooldown and clear serialize with this decision.
+async fn pick_due_job(state: &AppState) -> Result<Option<SubjectJob>> {
+    let now = ServerConfig::now_ms();
+    let mut tx = state.pool.begin_with("BEGIN IMMEDIATE").await?;
+    let row = sqlx::query(
+        "SELECT j.category,j.subject_id,j.attempts,j.priority,j.run_token FROM subject_jobs j
+         JOIN subject_runtime c ON c.category=j.category CROSS JOIN subject_runtime g
+         WHERE g.category='*' AND g.paused=0 AND c.paused=0
+           AND MAX(g.next_request_ms,c.next_request_ms,c.blocked_until_ms)<=?
+           AND j.state IN ('queued','running') AND COALESCE(j.next_run_ms,0)<=?
+           AND NOT EXISTS(SELECT 1 FROM subject_cache_checks x WHERE x.category=j.category AND x.subject_id=j.subject_id AND x.hold_until_ms>? AND j.priority!=0)
+         ORDER BY CASE WHEN j.attempts>0 AND c.retry_streak<2 THEN 0 WHEN j.attempts=0 AND c.retry_streak>=2 THEN 0 ELSE 1 END,
+           j.priority ASC, COALESCE(j.retry_since_ms,j.created_ms) ASC,j.rowid ASC LIMIT 1")
+        .bind(now).bind(now).bind(now).fetch_optional(&mut *tx).await?;
+    let Some(r) = row else {
+        tx.commit().await?;
+        return Ok(None);
+    };
+    let category: String = r.get("category");
+    let subject_id: String = r.get("subject_id");
+    let attempts: i64 = r.get("attempts");
+    let run_token = super::subject_queue::operation_id();
+    // A prior process may have died after claiming. Preserve that unknown outcome explicitly.
+    if let Some(old) = r.get::<Option<String>, _>("run_token") {
+        sqlx::query("UPDATE subject_attempts SET outcome='interrupted',finished_ms=? WHERE run_token=? AND outcome='started'")
+            .bind(now).bind(old).execute(&mut *tx).await?;
+    }
+    sqlx::query("UPDATE subject_jobs SET state='running',run_token=?,updated_ms=? WHERE category=? AND subject_id=?")
+        .bind(&run_token).bind(now).bind(&category).bind(&subject_id).execute(&mut *tx).await?;
+    sqlx::query("UPDATE subject_runtime SET retry_streak=CASE WHEN ? THEN retry_streak+1 ELSE 0 END WHERE category=?")
+        .bind(attempts>0).bind(&category).execute(&mut *tx).await?;
+    sqlx::query("INSERT INTO subject_attempts(run_token,category,subject_id,attempt,started_ms) VALUES(?,?,?,?,?)")
+        .bind(&run_token).bind(&category).bind(&subject_id).bind(attempts+1).bind(now).execute(&mut *tx).await?;
+    tx.commit().await?;
+    Ok(Some(SubjectJob {
+        category,
+        subject_id,
+        attempts,
+        priority: r.get("priority"),
+        run_token,
+    }))
+}
+
+/// Fetch and commit immediately. Request deadlines replace a sleep that blocked other categories.
 pub async fn process_next_job<F: DoubanFetcher>(state: &AppState, fetcher: &F) -> Result<bool> {
     if !state.config.subject_enrich {
         return Ok(false);
     }
-    let Some(job) = pick_due_job(&state.pool).await? else {
+    let Some(job) = pick_due_job(state).await? else {
         return Ok(false);
     };
-
-    // 执行守卫：库中已有该条目且非显式强制重抓（priority=0）→ 跳过，不请求豆瓣。
-    // 入队侧虽已收紧为只入缺失条目，守卫保证"已在库 → 零请求"在任何入队路径下都成立
-    //（如清理 job 后被旧路径重排、未来入队逻辑演化）。
     if job.priority != 0 {
-        let exists: Option<i64> =
-            sqlx::query_scalar("SELECT 1 FROM subjects WHERE category = ? AND subject_id = ?")
-                .bind(&job.category)
-                .bind(&job.subject_id)
-                .fetch_optional(&state.pool)
-                .await?;
-        if exists.is_some() {
-            sqlx::query(
-                "UPDATE subject_jobs SET state='ok', attempts=0, next_run_ms=NULL,
-                        last_error=NULL, updated_ms=?
-                 WHERE category=? AND subject_id=?",
-            )
-            .bind(ServerConfig::now_ms())
-            .bind(&job.category)
-            .bind(&job.subject_id)
-            .execute(&state.pool)
-            .await?;
-            tracing::info!(
-                subject = format!("{}/{}", job.category, job.subject_id),
-                "跳过富集：subjects 已有该条目（非强制重抓）"
-            );
+        let exists: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM subjects WHERE category=? AND subject_id=?)",
+        )
+        .bind(&job.category)
+        .bind(&job.subject_id)
+        .fetch_one(&state.pool)
+        .await?;
+        if exists {
+            let mut tx = state.pool.begin_with("BEGIN IMMEDIATE").await?;
+            finish_job(&mut tx, &job, "ok", 0, None, None).await?;
+            finish_attempt(&mut tx, &job, "cached", None, None).await?;
+            tx.commit().await?;
             return Ok(true);
         }
     }
-
+    super::subject_queue::restore_pacing(state, &job.category).await?;
+    // Reserve before I/O so a crash cannot discard the next request deadline.
+    // Cache hits above consume no request budget.
     let now = ServerConfig::now_ms();
-    // 标记 running：崩溃后残留的 running 行也会被 pick_due_job 重新拾起
-    let claimed = sqlx::query(
-        "UPDATE subject_jobs SET state='running', updated_ms=? WHERE category=? AND subject_id=?
-         AND state IN ('queued','running')
-         AND (priority=0 OR NOT EXISTS (SELECT 1 FROM subject_cache_checks c
-              WHERE c.category=subject_jobs.category AND c.subject_id=subject_jobs.subject_id AND c.hold_until_ms>?))",
+    let mut reservation = state.pool.begin_with("BEGIN IMMEDIATE").await?;
+    sqlx::query(
+        "UPDATE subject_runtime SET next_request_ms=MAX(next_request_ms,?) WHERE category=?",
     )
-    .bind(now)
+    .bind(now + (state.subject_interval(&job.category) * 1000.0) as i64)
     .bind(&job.category)
-    .bind(&job.subject_id)
-    .bind(now)
-    .execute(&state.pool)
+    .execute(&mut *reservation)
     .await?;
-    if claimed.rows_affected() == 0 {
-        return Ok(true);
-    }
+    sqlx::query(
+        "UPDATE subject_runtime SET next_request_ms=MAX(next_request_ms,?) WHERE category='*'",
+    )
+    .bind(now + (state.config.crawl_min_interval_secs.max(0.0) * 1000.0) as i64)
+    .execute(&mut *reservation)
+    .await?;
+    reservation.commit().await?;
 
     match fetcher.fetch_subject(&job.category, &job.subject_id).await {
         Ok(value) => {
-            state.record_crawl_success();
-            // 全局节流：与页面抓取共用令牌桶语义；rexxar 另按类别 AIMD 自适应
-            //（movie 端点限流远严于 music/book，成功后间隔缓慢收缩）
-            let interval = state
-                .subject_interval_after_success(&job.category)
-                .max(state.config.crawl_min_interval_secs)
-                + rand::thread_rng().gen_range(0.0..1.0);
-            tokio::time::sleep(std::time::Duration::from_secs_f64(interval)).await;
-
             let category = Category::from_key(&job.category)
                 .with_context(|| format!("未知 category: {}", job.category))?;
             let row = map_rexxar(category, &value);
-            upsert_subject_row(&state.pool, &job.category, &job.subject_id, &row, "rexxar").await?;
-            sqlx::query(
-                "UPDATE subject_jobs SET state='ok', attempts=0, next_run_ms=NULL,
-                        last_error=NULL, updated_ms=?
-                 WHERE category=? AND subject_id=?",
-            )
-            .bind(ServerConfig::now_ms())
-            .bind(&job.category)
-            .bind(&job.subject_id)
-            .execute(&state.pool)
-            .await?;
-            tracing::info!(
-                subject = format!("{}/{}", job.category, job.subject_id),
-                title = %row.title,
-                "条目元信息富集完成"
-            );
+            let interval = state.subject_interval_after_success(&job.category);
+            let mut tx = state.pool.begin_with("BEGIN IMMEDIATE").await?;
+            upsert_subject_row(&mut tx, &job.category, &job.subject_id, &row, "rexxar").await?;
+            finish_job(&mut tx, &job, "ok", 0, None, None).await?;
+            finish_attempt(&mut tx, &job, "success", None, None).await?;
+            persist_pacing(state, &mut tx, &job, interval, true).await?;
+            tx.commit().await?;
+            state.record_crawl_success();
+            tracing::info!(subject=format!("{}/{}",job.category,job.subject_id),title=%row.title,recovered=job.attempts>0,"条目元信息富集完成");
         }
         Err(e) => handle_job_error(state, &job, e).await?,
     }
     Ok(true)
 }
 
-async fn pick_due_job(pool: &SqlitePool) -> Result<Option<SubjectJob>> {
-    let row = sqlx::query(
-        "SELECT category, subject_id, attempts, priority FROM subject_jobs
-         WHERE state IN ('queued','running')
-           AND (next_run_ms IS NULL OR next_run_ms <= ?)
-           AND (priority=0 OR NOT EXISTS (SELECT 1 FROM subject_cache_checks c
-                WHERE c.category=subject_jobs.category AND c.subject_id=subject_jobs.subject_id AND c.hold_until_ms>?))
-         ORDER BY priority ASC, updated_ms ASC, rowid ASC
-         LIMIT 1",
-    )
-    .bind(ServerConfig::now_ms())
-    .bind(ServerConfig::now_ms())
-    .fetch_optional(pool)
-    .await
-    .context("查询到期富集 job 失败")?;
-    Ok(row.map(|r| SubjectJob {
-        category: r.get("category"),
-        subject_id: r.get("subject_id"),
-        attempts: r.get("attempts"),
-        priority: r.get("priority"),
-    }))
+async fn finish_job(
+    conn: &mut sqlx::SqliteConnection,
+    job: &SubjectJob,
+    status: &str,
+    attempts: i64,
+    next: Option<i64>,
+    error: Option<&str>,
+) -> Result<()> {
+    sqlx::query("UPDATE subject_jobs SET state=?,attempts=?,next_run_ms=?,last_error=?,updated_ms=?,run_token=NULL,
+      retry_since_ms=CASE WHEN ?='queued' THEN COALESCE(retry_since_ms,?) ELSE NULL END
+      WHERE category=? AND subject_id=? AND run_token=?")
+        .bind(status).bind(attempts).bind(next).bind(error).bind(ServerConfig::now_ms()).bind(status).bind(ServerConfig::now_ms())
+        .bind(&job.category).bind(&job.subject_id).bind(&job.run_token).execute(conn).await?;
+    Ok(())
 }
 
-/// 失败处理对齐维度抓取，并在 rexxar 限流特性上加固（2026-10-28 实测：
-/// movie 端点连发 4-8 个请求即 400 封锁约 5-6 分钟，404 同样累积触发；
-/// 见《豆瓣源依赖性与脆弱性分析.md》）：
-/// - 404 → 永久终态 not_found（顺带推迟同类 job——404 也会累积触发封锁）；
-/// - 限流（4xx）→ 该类别 AIMD 升档 + 类别冷却（同类 job 全部推迟），
-///   避免同类连发把全局熔断每 10 分钟拖停一轮；
-/// - 指数退避 20s·3^(n-1)，跨过封锁窗口，不再于封锁期内烧光尝试次数；
-/// - 重试耗尽 → 不终态 error 而是**落 intro 兜底行**（source='intro'），
-///   数据降级但齐整、不再重试；records 无该条目（理论不可达）才维持 error；
-/// - 可重试失败仍计入全局熔断（类别冷却已把同类失败隔开，熔断是最后防线）。
+async fn finish_attempt(
+    conn: &mut sqlx::SqliteConnection,
+    job: &SubjectJob,
+    outcome: &str,
+    error: Option<&FetchError>,
+    http: Option<i64>,
+) -> Result<()> {
+    sqlx::query("UPDATE subject_attempts SET finished_ms=?,outcome=?,error_code=?,http_status=?,error=?,recovered=? WHERE run_token=?")
+        .bind(ServerConfig::now_ms()).bind(outcome).bind(error.map(|e|e.code())).bind(http).bind(error.map(|e|e.to_string()))
+        .bind(outcome=="success" && job.attempts>0).bind(&job.run_token).execute(conn).await?;
+    Ok(())
+}
+
+async fn persist_pacing(
+    state: &AppState,
+    conn: &mut sqlx::SqliteConnection,
+    job: &SubjectJob,
+    interval: f64,
+    success: bool,
+) -> Result<()> {
+    let now = ServerConfig::now_ms();
+    let jitter = rand::thread_rng().gen_range(0.0..1.0);
+    sqlx::query("UPDATE subject_runtime SET interval_secs=?,pacing_updated_ms=?,next_request_ms=?,block_streak=CASE WHEN ? THEN 0 ELSE block_streak END WHERE category=?")
+        .bind(interval).bind(now).bind(now+((interval+jitter)*1000.0) as i64).bind(success).bind(&job.category)
+        .execute(&mut *conn).await?;
+    sqlx::query(
+        "UPDATE subject_runtime SET next_request_ms=MAX(next_request_ms,?) WHERE category='*'",
+    )
+    .bind(now + ((state.config.crawl_min_interval_secs.max(0.0) + jitter) * 1000.0) as i64)
+    .execute(conn)
+    .await?;
+    Ok(())
+}
+
 async fn handle_job_error(state: &AppState, job: &SubjectJob, e: FetchError) -> Result<()> {
     let now = ServerConfig::now_ms();
-    tracing::warn!(
-        subject = format!("{}/{}", job.category, job.subject_id),
-        attempt = job.attempts + 1,
-        error = %e,
-        "条目富集失败"
-    );
     let attempts = job.attempts + 1;
+    let blocked = matches!(e, FetchError::Blocked(_));
     let permanent = !e.is_transient();
-
-    if permanent {
-        // 404：条目已被豆瓣删除，终态。不计熔断（非拒绝服务），
-        // 但 404 连发同样会触发端点封锁，顺带推迟同类 job
-        defer_category_jobs(state, &job.category).await?;
-        sqlx::query(
-            "UPDATE subject_jobs SET state='not_found', attempts=?, next_run_ms=NULL,
-                    last_error=?, updated_ms=?
-             WHERE category=? AND subject_id=?",
-        )
-        .bind(attempts)
-        .bind(format!("{}: {e}", e.code()))
-        .bind(now)
-        .bind(&job.category)
-        .bind(&job.subject_id)
-        .execute(&state.pool)
-        .await?;
-        return Ok(());
+    let http = match &e {
+        FetchError::Blocked(code) => Some(*code as i64),
+        FetchError::NotFound => Some(404),
+        _ => None,
+    };
+    let interval = if blocked {
+        state.subject_interval_after_block(&job.category)
+    } else {
+        state.subject_interval(&job.category)
+    };
+    let mut tx = state.pool.begin_with("BEGIN IMMEDIATE").await?;
+    persist_pacing(state, &mut tx, job, interval, false).await?;
+    if !blocked {
+        sqlx::query("UPDATE subject_runtime SET block_streak=0 WHERE category=?")
+            .bind(&job.category)
+            .execute(&mut *tx)
+            .await?;
     }
-
-    // 限流实锤（4xx）：类别 AIMD 升档 + 同类冷却，保证后续失败被其他类别的
-    // 成功隔开（成功会重置熔断连续计数），不再形成"5 连败 → 全局停 10 分钟"循环
-    let mut defer_until: Option<i64> = None;
-    if matches!(e, FetchError::Blocked(_)) {
-        state.subject_interval_after_block(&job.category);
-        defer_until = Some(defer_category_jobs(state, &job.category).await?);
+    let mut until = now;
+    if blocked || permanent {
+        let streak: i64 =
+            sqlx::query_scalar("SELECT block_streak FROM subject_runtime WHERE category=?")
+                .bind(&job.category)
+                .fetch_one(&mut *tx)
+                .await?;
+        let factor = if blocked && state.config.subject_adaptive_cooldown {
+            1i64 << streak.clamp(0, 4)
+        } else {
+            1
+        };
+        // Only uninterrupted blocked probes increase the experimental cooldown; success resets it.
+        let base = state.config.subject_category_cooldown_secs.max(0);
+        let seconds = (base.saturating_mul(factor)).min(base.max(1800));
+        until = now + seconds * 1000 + rand::thread_rng().gen_range(0..30_000);
+        sqlx::query("UPDATE subject_runtime SET blocked_until_ms=MAX(blocked_until_ms,?),block_streak=CASE WHEN ? THEN block_streak+1 ELSE 0 END WHERE category=?")
+            .bind(until).bind(blocked).bind(&job.category).execute(&mut *tx).await?;
+        // Preserve next_run visibility for existing jobs; the category gate also covers future jobs.
+        sqlx::query("UPDATE subject_jobs SET next_run_ms=MAX(COALESCE(next_run_ms,0),?) WHERE category=? AND state IN ('queued','running')")
+            .bind(until).bind(&job.category).execute(&mut *tx).await?;
     }
-
-    let over_limit = attempts >= MAX_ATTEMPTS;
-    let (job_state, next_run, last_error) = if over_limit {
-        match write_intro_fallback(state, job).await? {
-            true => (
+    let mut error = format!("{}: {e}", e.code());
+    let (status, outcome, next) = if permanent {
+        ("not_found", "not_found", None)
+    } else if attempts >= MAX_ATTEMPTS {
+        let row=sqlx::query("SELECT title,alt_title,subject_url,cover,intro FROM records WHERE category=? AND subject_id=? LIMIT 1")
+            .bind(&job.category).bind(&job.subject_id).fetch_optional(&mut *tx).await?;
+        if let Some(r) = row {
+            let record = crate::crawler::Record {
+                category: job.category.clone(),
+                subject_id: job.subject_id.clone(),
+                title: r.get("title"),
+                alt_title: r.get("alt_title"),
+                subject_url: r.get("subject_url"),
+                cover: r.get("cover"),
+                intro: r.get("intro"),
+                ..Default::default()
+            };
+            // An in-flight failure must not downgrade an already available authoritative result.
+            let authoritative:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM subjects WHERE category=? AND subject_id=? AND source='rexxar')")
+                .bind(&job.category).bind(&job.subject_id).fetch_one(&mut *tx).await?;
+            if !authoritative {
+                upsert_subject_row(
+                    &mut tx,
+                    &job.category,
+                    &job.subject_id,
+                    &intro_fallback_row(&record),
+                    "intro",
+                )
+                .await?;
+            }
+            error = if authoritative {
+                format!("重试耗尽，保留已有 rexxar 缓存: {error}")
+            } else {
+                format!("已降级 intro 兜底（重试耗尽）: {error}")
+            };
+            (
                 "ok",
+                if authoritative {
+                    "retained"
+                } else {
+                    "fallback"
+                },
                 None,
-                format!("已降级 intro 兜底（重试耗尽）: {}: {e}", e.code()),
-            ),
-            false => ("error", None, format!("{}: {e}", e.code())),
+            )
+        } else {
+            ("error", "error", None)
         }
     } else {
-        // 指数退避：20s / 60s / 180s / 540s（第 5 次耗尽走兜底）
-        let backoff_ms = 20_000 * 3_i64.pow((attempts as u32).saturating_sub(1))
+        let backoff = 20_000 * 3_i64.pow((attempts as u32).saturating_sub(1))
             + rand::thread_rng().gen_range(0..5_000);
-        let next = now + backoff_ms;
-        // 被限流时自身重试也须等类别冷却结束（它就是下一轮的探测请求）
-        let next = defer_until.map_or(next, |until| next.max(until));
-        ("queued", Some(next), format!("{}: {e}", e.code()))
+        ("queued", "retry", Some((now + backoff).max(until)))
     };
-
-    sqlx::query(
-        "UPDATE subject_jobs SET state=?, attempts=?, next_run_ms=?, last_error=?, updated_ms=?
-         WHERE category=? AND subject_id=?",
-    )
-    .bind(job_state)
-    .bind(attempts)
-    .bind(next_run)
-    .bind(last_error)
-    .bind(now)
-    .bind(&job.category)
-    .bind(&job.subject_id)
-    .execute(&state.pool)
-    .await?;
-    // 计入全局熔断：正常情况下类别冷却已隔开同类失败、其他类别的成功会
-    // 重置计数；连续 5 次失败意味着多端点同时被拒，全局暂停是正确反应
-    let tripped = state.record_crawl_failure();
-    if tripped {
+    finish_job(&mut tx, job, status, attempts, next, Some(&error)).await?;
+    finish_attempt(&mut tx, job, outcome, Some(&e), http).await?;
+    tx.commit().await?;
+    tracing::warn!(subject=format!("{}/{}",job.category,job.subject_id),attempt=attempts,error=%e,outcome,"条目富集失败");
+    if !permanent && state.record_crawl_failure() {
         tracing::info!("熔断已触发，worker 将暂停抓取直至冷却结束");
     }
     Ok(())
 }
 
-/// 类别冷却：把该类别全部非强制 job 推迟到冷却期后（MAX 保证不缩短既有
-/// 更长退避），返回冷却截止时间。priority=0 的显式强制重排不受限
-/// （管理员明确要求立即执行）。
-async fn defer_category_jobs(state: &AppState, category: &str) -> Result<i64> {
-    let until = ServerConfig::now_ms()
-        + state.config.subject_category_cooldown_secs * 1000
-        + rand::thread_rng().gen_range(0..30_000);
-    sqlx::query(
-        "UPDATE subject_jobs
-         SET next_run_ms = MAX(COALESCE(next_run_ms, 0), ?)
-         WHERE category = ? AND state IN ('queued','running') AND priority != 0",
-    )
-    .bind(until)
-    .bind(category)
-    .execute(&state.pool)
-    .await
-    .context("类别冷却推迟富集 job 失败")?;
-    Ok(until)
-}
-
-/// 重试耗尽的兜底：以 records.intro（收藏页随抓取入库，零额外请求）合成
-/// 降级行写入 subjects（source='intro'，无豆瓣评分、封面为收藏页小图），
-/// 形状与 rexxar 行一致；job 置 ok，重试链终结。升级路径：单条 refresh
-/// 或 requeue scope=stale（TTL 过期后）→ priority=0 强制 → rexxar 成功即
-/// 覆盖为权威数据。返回 false = records 无该条目（入队来源即 records，
-/// 理论不可达），调用方维持 error 终态。
-async fn write_intro_fallback(state: &AppState, job: &SubjectJob) -> Result<bool> {
-    let row = sqlx::query(
-        "SELECT title, alt_title, subject_url, cover, intro FROM records
-         WHERE category = ? AND subject_id = ? LIMIT 1",
-    )
-    .bind(&job.category)
-    .bind(&job.subject_id)
-    .fetch_optional(&state.pool)
-    .await?;
-    let Some(r) = row else { return Ok(false) };
-    let record = crate::crawler::Record {
-        category: job.category.clone(),
-        status: String::new(),
-        title: r.get("title"),
-        alt_title: r.get("alt_title"),
-        my_rating: None,
-        date: String::new(),
-        comment: String::new(),
-        subject_url: r.get("subject_url"),
-        subject_id: job.subject_id.clone(),
-        cover: r.get("cover"),
-        comment_id: String::new(),
-        intro: r.get("intro"),
-    };
-    let subject_row = intro_fallback_row(&record);
-    upsert_subject_row(
-        &state.pool,
-        &job.category,
-        &job.subject_id,
-        &subject_row,
-        "intro",
-    )
-    .await?;
-    tracing::warn!(
-        subject = format!("{}/{}", job.category, job.subject_id),
-        title = %subject_row.title,
-        "富集重试耗尽，已落 intro 兜底行（可强制重排升级）"
-    );
-    Ok(true)
-}
-
 async fn upsert_subject_row(
-    pool: &SqlitePool,
+    conn: &mut sqlx::SqliteConnection,
     category: &str,
     subject_id: &str,
     row: &SubjectRow,
@@ -546,7 +562,7 @@ async fn upsert_subject_row(
     .bind(&row.raw_json)
     .bind(source)
     .bind(ServerConfig::now_ms())
-    .execute(pool)
+    .execute(conn)
     .await
     .context("条目元信息入库失败")?;
     Ok(())
@@ -717,13 +733,10 @@ pub async fn list_jobs(
 /// DELETE /subjects/jobs/{category}/{subject_id}：删除单个 job（任意状态）。
 /// 删除 queued 即取消该条目；删除终态失败 job 后，下次同步可重新入队。
 pub async fn delete_job(pool: &SqlitePool, category: &str, subject_id: &str) -> AppResult<()> {
-    let res = sqlx::query("DELETE FROM subject_jobs WHERE category=? AND subject_id=?")
-        .bind(category)
-        .bind(subject_id)
-        .execute(pool)
-        .await
-        .context("删除富集 job 失败")?;
-    if res.rows_affected() == 0 {
+    let states = ["queued", "running", "ok", "error", "not_found"].map(str::to_owned);
+    let result =
+        super::subject_queue::clear(pool, &states, Some(category), Some(subject_id)).await?;
+    if result["deleted"].as_u64() == Some(0) {
         return Err(AppError::JobNotFound(format!("{category}/{subject_id}")));
     }
     Ok(())
@@ -737,30 +750,21 @@ pub async fn clear_jobs(
     states: &[String],
     category: Option<&str>,
 ) -> Result<u64> {
-    let placeholders = vec!["?"; states.len()].join(",");
-    let mut sql = format!("DELETE FROM subject_jobs WHERE state IN ({placeholders})");
-    if category.is_some_and(|c| !c.is_empty() && c != "all") {
-        sql.push_str(" AND category = ?");
-    }
-    let mut query = sqlx::query(&sql);
-    for st in states {
-        query = query.bind(st);
-    }
-    if let Some(c) = category {
-        query = query.bind(c);
-    }
-    Ok(query.execute(pool).await?.rows_affected())
+    let result = super::subject_queue::clear(pool, states, category, None).await?;
+    Ok(result["deleted"].as_u64().unwrap_or(0))
 }
 
 /// POST /subjects/jobs/requeue：批量重排。
 /// - failed / not_found：对应终态 job 重新排队（priority=0 插队；not_found 多为
 ///   条目被豆瓣删除，重排仅在怀疑误判时使用）；
-/// - stale：subjects 中已过 TTL 的条目强制重抓（priority=0 绕过执行守卫）——
+/// - stale：subjects 中已过 TTL 的条目强制重抓（priority=0 绕过缓存命中，仍遵守暂停/冷却）——
 ///   这是"重新抓取库中已有条目"唯一的批量入口。
 pub async fn requeue_jobs(state: &AppState, scope: &str, category: Option<&str>) -> Result<u64> {
     let now = ServerConfig::now_ms();
-    let has_category = category.is_some_and(|c| !c.is_empty() && c != "all");
-    match scope {
+    let category = category.filter(|c| !c.is_empty() && *c != "all");
+    let has_category = category.is_some();
+    let mut tx = state.pool.begin_with("BEGIN IMMEDIATE").await?;
+    let queued = match scope {
         "failed" | "not_found" => {
             let from = if scope == "failed" {
                 "error"
@@ -769,7 +773,7 @@ pub async fn requeue_jobs(state: &AppState, scope: &str, category: Option<&str>)
             };
             let mut sql = format!(
                 "UPDATE subject_jobs SET state='queued', attempts=0, next_run_ms=NULL,
-                        last_error=NULL, priority=0, updated_ms=?
+                        last_error=NULL, retry_since_ms=NULL, run_token=NULL, priority=0, updated_ms=?
                  WHERE state = '{from}'"
             );
             if has_category {
@@ -779,7 +783,7 @@ pub async fn requeue_jobs(state: &AppState, scope: &str, category: Option<&str>)
             if let Some(c) = category {
                 query = query.bind(c);
             }
-            Ok(query.execute(&state.pool).await?.rows_affected())
+            query.execute(&mut *tx).await?.rows_affected()
         }
         "stale" => {
             let stale_before = now - state.config.subject_ttl_secs * 1000;
@@ -795,17 +799,30 @@ pub async fn requeue_jobs(state: &AppState, scope: &str, category: Option<&str>)
             sql.push_str(
                 " ON CONFLICT(category, subject_id) DO UPDATE SET \
                    state='queued', attempts=0, next_run_ms=NULL, last_error=NULL, \
-                   priority=0, updated_ms=excluded.updated_ms \
+                   priority=0, retry_since_ms=NULL, run_token=NULL, updated_ms=excluded.updated_ms \
                    WHERE subject_jobs.state NOT IN ('queued','running')",
             );
             let mut query = sqlx::query(&sql).bind(now).bind(now).bind(stale_before);
             if let Some(c) = category {
                 query = query.bind(c);
             }
-            Ok(query.execute(&state.pool).await?.rows_affected())
+            query.execute(&mut *tx).await?.rows_affected()
         }
         _ => unreachable!("scope 已在路由层校验"),
-    }
+    };
+    let id = super::subject_queue::operation_id();
+    super::subject_queue::audit(
+        &mut tx,
+        &id,
+        "requeue",
+        category.unwrap_or("all"),
+        &json!({"scope":scope}),
+        &json!({"queued":queued}),
+    )
+    .await?;
+    tx.commit().await?;
+    tracing::info!(operation_id=%id,scope,category=?category,queued,"enrichment jobs requeued");
+    Ok(queued)
 }
 
 // --------------------------------------------------------------------------- //

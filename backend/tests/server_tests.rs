@@ -49,6 +49,10 @@ fn test_config(dir: &TempDir, token: &str) -> ServerConfig {
         subject_ttl_secs: 2_592_000,
         subject_min_interval_secs: 0.0, // 测试不限速
         subject_category_cooldown_secs: 300,
+        subject_movie_min_interval_secs: None,
+        subject_movie_initial_interval_secs: None,
+        subject_pacing_ttl_secs: 86400,
+        subject_adaptive_cooldown: false,
         subject_cache_serve: false,
         subject_cache_url: None,
         desktop_app: false,
@@ -430,7 +434,9 @@ async fn verify_user_fetches_page_upserts_profile_then_short_circuits() {
         assert!(url.contains("/people/zhuma/collect?start=0"), "{url}");
         Ok(fixture("music_collect_p1.html"))
     });
-    let view = service::verify_user(&state, &fetcher, "zhuma").await.unwrap();
+    let view = service::verify_user(&state, &fetcher, "zhuma")
+        .await
+        .unwrap();
     assert_eq!(view.uid, "zhuma");
     assert_eq!(view.username, "芝麻");
     assert_eq!(
@@ -447,7 +453,9 @@ async fn verify_user_fetches_page_upserts_profile_then_short_circuits() {
             Ok(fixture("music_collect_p1.html"))
         })
     };
-    let again = service::verify_user(&state, &counting, "zhuma").await.unwrap();
+    let again = service::verify_user(&state, &counting, "zhuma")
+        .await
+        .unwrap();
     assert_eq!(again.username, "芝麻");
     assert_eq!(calls.load(Ordering::SeqCst), 0);
 }
@@ -457,13 +465,17 @@ async fn verify_user_maps_not_found_and_enforces_cooldown() {
     let (_dir, state) = setup().await;
     // 豆瓣 404 → PAGE_NOT_FOUND（区别于本地未同步的 USER_NOT_FOUND）
     let missing = FakeFetcher(|_url: &str| Err(FetchError::NotFound));
-    let err = service::verify_user(&state, &missing, "nobody").await.unwrap_err();
+    let err = service::verify_user(&state, &missing, "nobody")
+        .await
+        .unwrap_err();
     assert_eq!(err.code(), "PAGE_NOT_FOUND");
 
     // 失败也记冷却：换成功 fetcher 立即重测仍被拒（本地无行、冷却未过）
     assert!(state.verify_cooldown_remaining_ms("nobody") > 0);
     let ok = FakeFetcher(|_url: &str| Ok(fixture("music_collect_p1.html")));
-    let err = service::verify_user(&state, &ok, "nobody").await.unwrap_err();
+    let err = service::verify_user(&state, &ok, "nobody")
+        .await
+        .unwrap_err();
     assert_eq!(err.code(), "TOO_MANY_REQUESTS");
 }
 
@@ -472,12 +484,16 @@ async fn verify_user_blocked_or_profileless_maps_upstream() {
     let (_dir, state) = setup().await;
     // 限流/超时类瞬态失败 → DOUBAN_UNAVAILABLE
     let blocked = FakeFetcher(|_url: &str| Err(FetchError::Blocked(403)));
-    let err = service::verify_user(&state, &blocked, "limited").await.unwrap_err();
+    let err = service::verify_user(&state, &blocked, "limited")
+        .await
+        .unwrap_err();
     assert_eq!(err.code(), "DOUBAN_UNAVAILABLE");
 
     // 页面抓到但无资料块（改版/登录墙）：同为上游故障，不误报 ID 错误
     let blank = FakeFetcher(|_url: &str| Ok("<html><body>empty</body></html>".into()));
-    let err = service::verify_user(&state, &blank, "blankpage").await.unwrap_err();
+    let err = service::verify_user(&state, &blank, "blankpage")
+        .await
+        .unwrap_err();
     assert_eq!(err.code(), "DOUBAN_UNAVAILABLE");
 }
 
@@ -1840,6 +1856,10 @@ async fn enrichment_dedups_across_users() {
 
     // 驱动富集到完成
     for _ in 0..10 {
+        sqlx::query("UPDATE subject_runtime SET next_request_ms=0,blocked_until_ms=0")
+            .execute(&state.pool)
+            .await
+            .unwrap();
         if !subject::process_next_job(&state, &fetcher).await.unwrap() {
             break;
         }
@@ -1864,6 +1884,10 @@ async fn enrichment_dedups_across_users() {
         .unwrap();
     assert_eq!(qb2, 0, "库中已有的条目重复同步零入队");
     for _ in 0..10 {
+        sqlx::query("UPDATE subject_runtime SET next_request_ms=0,blocked_until_ms=0")
+            .execute(&state.pool)
+            .await
+            .unwrap();
         if !subject::process_next_job(&state, &fetcher).await.unwrap() {
             break;
         }
@@ -1959,6 +1983,10 @@ async fn enrichment_exhaustion_falls_back_to_intro() {
     });
     for _ in 0..subject::MAX_ATTEMPTS {
         assert!(subject::process_next_job(&state, &fetcher).await.unwrap());
+        sqlx::query("UPDATE subject_runtime SET next_request_ms=0,blocked_until_ms=0")
+            .execute(&state.pool)
+            .await
+            .unwrap();
         // 抹掉退避等待，模拟时间流逝（真实运行中由到期时间驱动）
         sqlx::query("UPDATE subject_jobs SET next_run_ms = NULL")
             .execute(&state.pool)
@@ -2061,6 +2089,10 @@ async fn enrichment_exhaustion_without_record_keeps_error() {
     });
     for _ in 0..subject::MAX_ATTEMPTS {
         assert!(subject::process_next_job(&state, &fetcher).await.unwrap());
+        sqlx::query("UPDATE subject_runtime SET next_request_ms=0,blocked_until_ms=0")
+            .execute(&state.pool)
+            .await
+            .unwrap();
         sqlx::query("UPDATE subject_jobs SET next_run_ms = NULL")
             .execute(&state.pool)
             .await
@@ -2073,6 +2105,7 @@ async fn enrichment_exhaustion_without_record_keeps_error() {
     assert_eq!(job_state, "error");
     assert_eq!(count(&state, "SELECT COUNT(*) FROM subjects").await, 0);
 }
+#[tokio::test]
 async fn enrichment_404_is_terminal_not_found() {
     let (_dir, state) = setup().await;
     seed_record(&state, "wenjun30", "movie", "41001").await;
@@ -2098,7 +2131,11 @@ async fn enrichment_404_is_terminal_not_found() {
         1
     );
     assert_eq!(count(&state, "SELECT COUNT(*) FROM subjects").await, 0);
-    // 立即重跑不重试（终态）
+    // 即使等待条件都过期，终态也不自动重试。
+    sqlx::query("UPDATE subject_runtime SET next_request_ms=0,blocked_until_ms=0")
+        .execute(&state.pool)
+        .await
+        .unwrap();
     assert!(!subject::process_next_job(&state, &fetcher).await.unwrap());
 }
 
@@ -2313,6 +2350,10 @@ async fn subject_refresh_and_backfill_endpoints() {
     // 驱动到完成
     let fetcher = fixture_fetcher();
     for _ in 0..10 {
+        sqlx::query("UPDATE subject_runtime SET next_request_ms=0,blocked_until_ms=0")
+            .execute(&state.pool)
+            .await
+            .unwrap();
         if !subject::process_next_job(&state, &fetcher).await.unwrap() {
             break;
         }
@@ -2724,6 +2765,10 @@ async fn subjects_list_endpoint_filters_and_counts() {
         Err(FetchError::NotFound)
     });
     for _ in 0..10 {
+        sqlx::query("UPDATE subject_runtime SET next_request_ms=0,blocked_until_ms=0")
+            .execute(&state.pool)
+            .await
+            .unwrap();
         if !subject::process_next_job(&state, &fetcher).await.unwrap() {
             break;
         }

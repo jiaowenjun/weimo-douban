@@ -173,6 +173,61 @@ CREATE INDEX IF NOT EXISTS idx_records_subject ON records(category, subject_id);
 CREATE INDEX IF NOT EXISTS idx_subjects_retry ON subjects(status, next_retry_ms);
 CREATE INDEX IF NOT EXISTS idx_subject_jobs_due ON subject_jobs(state, next_run_ms);
 
+-- Category policies survive restarts and apply to all queue entry points.
+CREATE TABLE IF NOT EXISTS subject_runtime (
+  category TEXT PRIMARY KEY,
+  paused INTEGER NOT NULL DEFAULT 0,
+  interval_secs REAL,
+  pacing_updated_ms INTEGER NOT NULL DEFAULT 0,
+  blocked_until_ms INTEGER NOT NULL DEFAULT 0,
+  next_request_ms INTEGER NOT NULL DEFAULT 0,
+  retry_streak INTEGER NOT NULL DEFAULT 0,
+  block_streak INTEGER NOT NULL DEFAULT 0
+);
+INSERT OR IGNORE INTO subject_runtime(category) VALUES ('*'), ('movie'), ('book'), ('music');
+
+-- One row per attempt, independent of the mutable/deletable queue.
+CREATE TABLE IF NOT EXISTS subject_attempts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  run_token TEXT NOT NULL UNIQUE,
+  category TEXT NOT NULL,
+  subject_id TEXT NOT NULL,
+  attempt INTEGER NOT NULL,
+  started_ms INTEGER NOT NULL,
+  finished_ms INTEGER,
+  outcome TEXT NOT NULL DEFAULT 'started',
+  error_code TEXT,
+  http_status INTEGER,
+  error TEXT,
+  recovered INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_subject_attempts_key ON subject_attempts(category, subject_id, id);
+CREATE INDEX IF NOT EXISTS idx_subject_attempts_time ON subject_attempts(started_ms);
+
+CREATE TABLE IF NOT EXISTS subject_operations (
+  id TEXT PRIMARY KEY,
+  kind TEXT NOT NULL,
+  category TEXT NOT NULL,
+  filters_json TEXT NOT NULL,
+  counts_json TEXT NOT NULL,
+  created_ms INTEGER NOT NULL,
+  restored_ms INTEGER
+);
+CREATE TABLE IF NOT EXISTS subject_job_snapshots (
+  operation_id TEXT NOT NULL REFERENCES subject_operations(id),
+  category TEXT NOT NULL,
+  subject_id TEXT NOT NULL,
+  state TEXT NOT NULL,
+  attempts INTEGER NOT NULL,
+  next_run_ms INTEGER,
+  priority INTEGER NOT NULL,
+  created_ms INTEGER NOT NULL,
+  updated_ms INTEGER NOT NULL,
+  last_error TEXT,
+  retry_since_ms INTEGER,
+  PRIMARY KEY(operation_id, category, subject_id)
+);
+
 CREATE TABLE IF NOT EXISTS app_preferences (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
@@ -226,6 +281,11 @@ pub async fn connect(db_path: &std::path::Path) -> Result<SqlitePool> {
     )
     .await?;
     ensure_column(&pool, "dimensions", "staging", "INTEGER NOT NULL DEFAULT 0").await?;
+    ensure_column(&pool, "subject_jobs", "retry_since_ms", "INTEGER").await?;
+    ensure_column(&pool, "subject_jobs", "run_token", "TEXT").await?;
+    // Best available lower bound for pre-migration retries; new retries keep their first failure time.
+    sqlx::query("UPDATE subject_jobs SET retry_since_ms=updated_ms WHERE attempts>0 AND state IN ('queued','running') AND retry_since_ms IS NULL")
+        .execute(&pool).await?;
     // A separate durable staging table keeps the last published snapshot readable.
     sqlx::query("CREATE TABLE IF NOT EXISTS record_staging AS SELECT * FROM records WHERE 0")
         .execute(&pool)

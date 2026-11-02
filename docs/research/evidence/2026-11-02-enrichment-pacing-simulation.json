@@ -1,0 +1,70 @@
+{
+  "scope": "Synthetic token-bucket sensitivity analysis; no live traffic or inferred Douban quota.",
+  "limitations": "No restarts, competing dimensions, response latency or finite retry budget; isolates pacing and cooldown only.",
+  "subjects": 1983,
+  "seed": 20261102,
+  "models": [
+    {
+      "name": "hypothesis_refill_30s_burst_4",
+      "refill_seconds": 30,
+      "capacity": 4,
+      "results": [
+        {
+          "floor_seconds": 3,
+          "successes": 1983,
+          "blocked_attempts": 191,
+          "simulated_hours": 28.09,
+          "successes_per_hour": 70.59,
+          "blocked_percent": 8.79
+        },
+        {
+          "floor_seconds": 45,
+          "successes": 1983,
+          "blocked_attempts": 0,
+          "simulated_hours": 25.07,
+          "successes_per_hour": 79.1,
+          "blocked_percent": 0.0
+        },
+        {
+          "floor_seconds": 60,
+          "successes": 1983,
+          "blocked_attempts": 0,
+          "simulated_hours": 33.33,
+          "successes_per_hour": 59.49,
+          "blocked_percent": 0.0
+        }
+      ]
+    },
+    {
+      "name": "hypothesis_refill_90s_burst_4",
+      "refill_seconds": 90,
+      "capacity": 4,
+      "results": [
+        {
+          "floor_seconds": 3,
+          "successes": 1983,
+          "blocked_attempts": 223,
+          "simulated_hours": 49.97,
+          "successes_per_hour": 39.68,
+          "blocked_percent": 10.11
+        },
+        {
+          "floor_seconds": 45,
+          "successes": 1983,
+          "blocked_attempts": 220,
+          "simulated_hours": 50.99,
+          "successes_per_hour": 38.89,
+          "blocked_percent": 9.99
+        },
+        {
+          "floor_seconds": 60,
+          "successes": 1983,
+          "blocked_attempts": 180,
+          "simulated_hours": 51.0,
+          "successes_per_hour": 38.88,
+          "blocked_percent": 8.32
+        }
+      ]
+    }
+  ]
+}

@@ -13,6 +13,7 @@ pub mod service;
 pub mod state;
 pub mod stats;
 pub mod subject;
+pub mod subject_queue;
 pub mod subject_cache;
 pub mod subject_cache_client;
 pub mod worker;
@@ -52,6 +53,7 @@ pub async fn build_server(config: config::ServerConfig) -> Result<axum::Router> 
     let pool = db::connect(&config.db_path())
         .await
         .context("数据库初始化失败")?;
+    subject_queue::recover_interrupted(&pool).await?;
     let state = state::AppState::new(config.clone(), pool);
 
     if let Err(error) = subject_cache_client::load_preferences(&state).await {

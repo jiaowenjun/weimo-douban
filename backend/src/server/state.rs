@@ -112,13 +112,16 @@ impl AppState {
     // music/book 在 3-4s 间隔下长跑无恙（2026-10-28 实测，详见
     // 《豆瓣源依赖性与脆弱性分析.md》）。固定间隔无法同时适配三类端点，
     // 按类别 AIMD：被限流 ×3（上限 90s）、成功 ×0.9（下限 = 配置最小间隔）。
-    // 进程内存态，重启回到配置默认值重新自适应。
+    // 执行前从 subject_runtime 恢复；内存仅为当前进程的镜像。
 
     /// 富集成功后收缩该类别间隔（×0.9，下限为配置最小间隔），返回新值
     pub fn subject_interval_after_success(&self, category: &str) -> f64 {
-        let floor = self.config.subject_min_interval_secs.max(0.5);
+        let floor = self.config.subject_floor(category);
         let mut table = self.subject_pacing.lock().unwrap();
-        let cur = table.get(category).copied().unwrap_or(floor);
+        let cur = table
+            .get(category)
+            .copied()
+            .unwrap_or(self.config.subject_initial(category));
         let next = (cur * 0.9).max(floor);
         table.insert(category.to_string(), next);
         next
@@ -126,23 +129,33 @@ impl AppState {
 
     /// 富集被限流（4xx）后放大该类别间隔（×3，上限 90s），返回新值
     pub fn subject_interval_after_block(&self, category: &str) -> f64 {
-        let floor = self.config.subject_min_interval_secs.max(0.5);
+        let floor = self.config.subject_floor(category);
         let mut table = self.subject_pacing.lock().unwrap();
-        let cur = table.get(category).copied().unwrap_or(floor);
-        let next = (cur * 3.0).min(90.0);
+        let cur = table
+            .get(category)
+            .copied()
+            .unwrap_or(self.config.subject_initial(category));
+        let next = (cur * 3.0).clamp(floor, 90.0);
         table.insert(category.to_string(), next);
         next
     }
 
     /// 当前类别间隔（缺省 = 配置最小间隔；只读，供测试断言）
     pub fn subject_interval(&self, category: &str) -> f64 {
-        let floor = self.config.subject_min_interval_secs.max(0.5);
+        let floor = self.config.subject_initial(category);
         self.subject_pacing
             .lock()
             .unwrap()
             .get(category)
             .copied()
             .unwrap_or(floor)
+    }
+
+    pub(crate) fn restore_subject_interval(&self, category: &str, interval: f64) {
+        self.subject_pacing
+            .lock()
+            .unwrap()
+            .insert(category.to_owned(), interval);
     }
 
     // ---- verify 端点冷却（防豆瓣侧滥用） ----

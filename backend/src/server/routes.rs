@@ -75,6 +75,13 @@ pub fn build_app(state: AppState) -> Router {
         .route("/subjects", get(list_subjects))
         .route("/subjects/backfill", post(backfill_subjects))
         .route("/subjects/jobs", get(list_subject_jobs))
+        .route("/subjects/jobs/overview", get(enrichment_overview))
+        .route("/subjects/jobs/history", get(enrichment_history))
+        .route("/subjects/jobs/control", post(enrichment_control))
+        .route(
+            "/subjects/jobs/restore/{operation_id}",
+            post(restore_enrichment),
+        )
         .route("/subjects/jobs/clear", post(clear_subject_jobs))
         .route("/subjects/jobs/requeue", post(requeue_subject_jobs))
         .route(
@@ -916,8 +923,81 @@ async fn clear_subject_jobs(State(state): State<AppState>, body: Bytes) -> AppRe
             )));
         }
     }
-    let deleted = subject::clear_jobs(&state.pool, &req.states, req.category.as_deref()).await?;
-    Ok(Json(json!({"deleted": deleted})))
+    if let Some(c) = req
+        .category
+        .as_deref()
+        .filter(|c| !c.is_empty() && *c != "all")
+    {
+        parse_category(c)?;
+    }
+    Ok(Json(
+        super::subject_queue::clear(&state.pool, &req.states, req.category.as_deref(), None)
+            .await?,
+    ))
+}
+
+#[derive(serde::Deserialize)]
+struct EnrichmentHistoryQuery {
+    category: Option<String>,
+    subject_id: Option<String>,
+    page: Option<i64>,
+    page_size: Option<i64>,
+}
+async fn enrichment_history(
+    State(state): State<AppState>,
+    Query(q): Query<EnrichmentHistoryQuery>,
+) -> AppResult<Json<Value>> {
+    if let Some(c) = q
+        .category
+        .as_deref()
+        .filter(|c| !c.is_empty() && *c != "all")
+    {
+        parse_category(c)?;
+    }
+    Ok(Json(
+        super::subject_queue::history(
+            &state.pool,
+            q.category.as_deref(),
+            q.subject_id.as_deref(),
+            q.page.unwrap_or(1),
+            q.page_size.unwrap_or(20),
+        )
+        .await?,
+    ))
+}
+
+async fn enrichment_overview(State(state): State<AppState>) -> AppResult<Json<Value>> {
+    Ok(Json(super::subject_queue::overview(&state).await?))
+}
+
+#[derive(serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct EnrichmentControlReq {
+    category: Option<String>,
+    paused: bool,
+}
+
+async fn enrichment_control(
+    State(state): State<AppState>,
+    Json(req): Json<EnrichmentControlReq>,
+) -> AppResult<Json<Value>> {
+    let category = req.category.as_deref().unwrap_or("all");
+    let category = if category == "all" {
+        "*"
+    } else {
+        parse_category(category)?;
+        category
+    };
+    Ok(Json(
+        super::subject_queue::set_paused(&state, category, req.paused).await?,
+    ))
+}
+
+async fn restore_enrichment(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> AppResult<Json<Value>> {
+    Ok(Json(super::subject_queue::restore(&state, &id).await?))
 }
 
 #[derive(serde::Deserialize)]
@@ -939,6 +1019,13 @@ async fn requeue_subject_jobs(
         return Err(AppError::InvalidArgument(
             "非法 scope（允许值: failed/not_found/stale）".to_string(),
         ));
+    }
+    if let Some(c) = req
+        .category
+        .as_deref()
+        .filter(|c| !c.is_empty() && *c != "all")
+    {
+        parse_category(c)?;
     }
     let queued = subject::requeue_jobs(&state, &req.scope, req.category.as_deref()).await?;
     state.wake_worker();

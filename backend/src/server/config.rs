@@ -84,6 +84,22 @@ pub struct ServerConfig {
     #[arg(long, env = "SYNC_SUBJECT_MIN_INTERVAL_SECS", default_value_t = 3.0)]
     pub subject_min_interval_secs: f64,
 
+    /// movie 独立间隔下限；未设置时沿用通用值，45–60s 仅作为对照实验候选
+    #[arg(long, env = "SYNC_SUBJECT_MOVIE_MIN_INTERVAL_SECS")]
+    pub subject_movie_min_interval_secs: Option<f64>,
+
+    /// movie 无有效历史时的初始间隔；未设置时使用该类别下限
+    #[arg(long, env = "SYNC_SUBJECT_MOVIE_INITIAL_INTERVAL_SECS")]
+    pub subject_movie_initial_interval_secs: Option<f64>,
+
+    /// 持久化间隔的有效期；超期重新使用初始值，但仍保留尚未结束的冷却
+    #[arg(long, env = "SYNC_SUBJECT_PACING_TTL_SECS", default_value_t = 86_400)]
+    pub subject_pacing_ttl_secs: i64,
+
+    /// 实验选项：冷却后首个请求仍被拒绝时递增冷却，默认关闭
+    #[arg(long, env = "SYNC_SUBJECT_ADAPTIVE_COOLDOWN", default_value_t = false)]
+    pub subject_adaptive_cooldown: bool,
+
     /// rexxar 单端点（category 维度）限流后的类别冷却（秒）。实测 movie 端点
     /// 连发 4-8 个请求即 400 封锁约 5-6 分钟（404 同样累积触发），封锁期间
     /// 该类别全部富集 job 推迟到冷却期后，music/book/维度抓取不受影响
@@ -108,6 +124,34 @@ pub struct ServerConfig {
 }
 
 impl ServerConfig {
+    pub fn subject_floor(&self, category: &str) -> f64 {
+        let value = if category == "movie" {
+            self.subject_movie_min_interval_secs
+                .unwrap_or(self.subject_min_interval_secs)
+        } else {
+            self.subject_min_interval_secs
+        };
+        if value.is_finite() {
+            value.clamp(0.5, 90.0)
+        } else {
+            3.0
+        }
+    }
+
+    pub fn subject_initial(&self, category: &str) -> f64 {
+        let floor = self.subject_floor(category);
+        let initial = if category == "movie" {
+            self.subject_movie_initial_interval_secs.unwrap_or(floor)
+        } else {
+            floor
+        };
+        if initial.is_finite() {
+            initial.clamp(floor, 90.0)
+        } else {
+            floor
+        }
+    }
+
     pub fn configure_desktop(&mut self) {
         self.desktop_app = true;
         self.subject_cache_serve = false;

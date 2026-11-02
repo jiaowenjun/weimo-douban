@@ -402,7 +402,7 @@ async fn import_batch(state: &AppState, items: Vec<CachedSubject>, generation: u
             .bind(item.rating_value).bind(item.rating_count).bind(item.meta.to_string()).bind(item.fetched_ms)
             .execute(&mut *tx).await?;
         imported += result.rows_affected();
-        sqlx::query("UPDATE subject_jobs SET state='ok',attempts=0,next_run_ms=NULL,last_error=NULL,updated_ms=?
+        sqlx::query("UPDATE subject_jobs SET state='ok',attempts=0,next_run_ms=NULL,last_error=NULL,retry_since_ms=NULL,run_token=NULL,updated_ms=?
             WHERE category=? AND subject_id=? AND priority!=0 AND state!='running'")
             .bind(ServerConfig::now_ms()).bind(&item.key.category).bind(&item.key.subject_id).execute(&mut *tx).await?;
     }

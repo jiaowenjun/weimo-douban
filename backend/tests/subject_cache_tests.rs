@@ -286,11 +286,13 @@ async fn center_hits_upgrade_intro_and_work_during_douban_cooldown() {
     let before = weimo_douban::server::cache::versions(&state, "user", "collect")
         .await
         .unwrap();
-    sqlx::query("UPDATE subject_jobs SET next_run_ms=?")
-        .bind(ServerConfig::now_ms() + 600_000)
-        .execute(&state.pool)
-        .await
-        .unwrap();
+    sqlx::query(
+        "UPDATE subject_jobs SET next_run_ms=?,attempts=1,retry_since_ms=1,last_error='HTTP 400'",
+    )
+    .bind(ServerConfig::now_ms() + 600_000)
+    .execute(&state.pool)
+    .await
+    .unwrap();
     for _ in 0..5 {
         state.record_crawl_failure();
     }
@@ -327,6 +329,12 @@ async fn center_hits_upgrade_intro_and_work_during_douban_cooldown() {
         2
     );
     assert_eq!(sync_once(&state).await.unwrap(), 0);
+    assert_eq!(
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM subject_jobs WHERE attempts!=0 OR retry_since_ms IS NOT NULL OR run_token IS NOT NULL OR last_error IS NOT NULL")
+            .fetch_one(&state.pool).await.unwrap(),
+        0,
+        "center cache completion clears the retry lifecycle too"
+    );
     assert_eq!(mock.calls.load(Ordering::SeqCst), 1);
 }
 
