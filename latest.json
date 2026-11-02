@@ -1,0 +1,15 @@
+{
+  "version": "0.5.4",
+  "notes": "\u5fae\u58a8\u00b7\u8c46\u74e3\u684c\u9762 App v0.5.4",
+  "pub_date": "2026-11-02T08:38:15Z",
+  "platforms": {
+    "darwin-aarch64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTQkxVekZ1cURCTUhVUGtTalkwcWloTWFxWlRGSFB1TTF2bGtsUUNtNnpBSmhUZEZEQ1JXdjE3SFBYbzdzVGR3NzN3b2xrMnh6ckdRWCt6b3JReU1ZRXY5YUZWdE5weUE4PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkzNjA4Njc1CWZpbGU65b6u5aKowrfosYbnk6MuYXBwLnRhci5negl2ZXJzaW9uOjAuNS40ClB5TzNJbnRDMm5ET3J0ZWtGaTRzU2MraVU1ZWRzNnQrelVUcjUyenNTdUt0Z3VDblVIT0g4WlJTSVQ4T2JIV0VxcUJ3cXZ1eTBESVFDMFRRVnd2eUFBPT0K",
+      "url": "https://gitee.com/jiaowenjun/weimo-douban/releases/download/v0.5.4/weimo-douban.app.tar.gz"
+    },
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVTQkxVekZ1cURCTUxBZFFUaDVnZlowOFBJKy9mcUIxelVWTXN2Qk5mdDdaTklNakJURzZkbnVCanVuamRObGZFUWZHM201MVhNWWJCVis1bGJ4RlRjQmo0aHlXVVJXOHdFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkzNjA4NDk0CWZpbGU65b6u5aKowrfosYbnk6NfMC41LjRfeDY0LXNldHVwLmV4ZQl2ZXJzaW9uOjAuNS40CnRhUTcrcmZrYXVza0loVk1ObGUrdVFINXdkYlcxdTEwVFlTNXd6ai9xaXY0dlJmWlFTdkJFMlVjcDgzcGhWOGpzTHV4RjNGSUJaNENqRVArVlQ4dUF3PT0K",
+      "url": "https://gitee.com/jiaowenjun/weimo-douban/releases/download/v0.5.4/weimo-douban_0.5.4_x64-setup.exe"
+    }
+  }
+}
