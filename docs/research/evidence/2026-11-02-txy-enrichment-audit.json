@@ -1,0 +1,1899 @@
+{
+  "report_date": "2026-11-02",
+  "timezone": "Asia/Shanghai",
+  "journal_query": {
+    "unit": "weimo-douban",
+    "since": "2026-10-30T00:00:00+08:00",
+    "until": "2026-11-02T09:55:00+08:00",
+    "format": "json",
+    "raw_sha256": "5279eead727478dd32c43bcc31b6b23992e5110d7c7e202f771177c025e6743a",
+    "raw_entries": 4707
+  },
+  "snapshot_note": "Database read after the 09:52 queue clear on 2026-11-02, before the scheduled 16:39 subscription; read-only investigation. Later state may differ.",
+  "code": {
+    "server_checkout": "31c6f6cf2638b0911e4980f70465735f03c7fa96",
+    "local_head": "df8669e3c170aae357667f450879387c62cf4fc0",
+    "matching_files": [
+      "subject.rs",
+      "state.rs",
+      "worker.rs",
+      "service.rs",
+      "config.rs"
+    ],
+    "runtime_binary_commit_verified": false
+  },
+  "categories": [
+    {
+      "category": "book",
+      "record_keys": 971,
+      "subjects": 971,
+      "jobs": 971,
+      "server_success_events": 916,
+      "server_success_unique": 916,
+      "seed_subjects": 55,
+      "seed_fetched_first": "2026-10-28T19:45:49.922+08:00",
+      "seed_fetched_last": "2026-10-28T19:49:20.799+08:00",
+      "http_400_events": 0
+    },
+    {
+      "category": "music",
+      "record_keys": 1989,
+      "subjects": 1989,
+      "jobs": 1988,
+      "server_success_events": 1961,
+      "server_success_unique": 1961,
+      "seed_subjects": 28,
+      "seed_fetched_first": "2026-10-28T21:42:46.264+08:00",
+      "seed_fetched_last": "2026-10-28T21:44:26.978+08:00",
+      "http_400_events": 0
+    },
+    {
+      "category": "movie",
+      "record_keys": 3431,
+      "subjects": 1448,
+      "jobs": 1447,
+      "server_success_events": 1240,
+      "server_success_unique": 1240,
+      "seed_subjects": 208,
+      "seed_fetched_first": "2026-10-28T19:49:25.130+08:00",
+      "seed_fetched_last": "2026-10-29T16:43:14.328+08:00",
+      "http_400_events": 160
+    }
+  ],
+  "recovery_summary": {
+    "failure_events": 160,
+    "unique_failed_subjects": 152,
+    "attempt_histogram": {
+      "1": 152,
+      "2": 8
+    },
+    "recovered_subjects": 49,
+    "recovered_failure_events": 57,
+    "unrecovered_subjects": 103,
+    "unrecovered_subjects_present_in_jobs": 0
+  },
+  "remaining_jobs": {
+    "total": 4406,
+    "states": {
+      "ok": 4406
+    },
+    "nonzero_attempts": 0,
+    "nonnull_last_error": 0
+  },
+  "subjects_without_jobs": [
+    {
+      "subject": "music/6064100",
+      "fetched_at": "2026-10-28T21:44:26.978+08:00",
+      "source": "rexxar"
+    },
+    {
+      "subject": "movie/2065161",
+      "fetched_at": "2026-11-02T09:52:19.536+08:00",
+      "source": "rexxar"
+    }
+  ],
+  "journal_markers": {
+    "熔断开启": 0,
+    "熔断已触发": 0,
+    "subject job tick failed": 0,
+    "已降级 intro": 0,
+    "重试耗尽": 0
+  },
+  "service_events": [
+    [
+      "2026-10-30T19:53:29.737804+08:00",
+      "Started weimo-douban.service - Weimo Douban API."
+    ],
+    [
+      "2026-10-30T20:36:04.119501+08:00",
+      "Stopped weimo-douban.service - Weimo Douban API."
+    ],
+    [
+      "2026-10-30T20:36:04.137827+08:00",
+      "Started weimo-douban.service - Weimo Douban API."
+    ],
+    [
+      "2026-10-31T16:09:54.186127+08:00",
+      "Stopped weimo-douban.service - Weimo Douban API."
+    ],
+    [
+      "2026-10-31T16:09:54.209950+08:00",
+      "Started weimo-douban.service - Weimo Douban API."
+    ],
+    [
+      "2026-11-01T12:19:54.648366+08:00",
+      "Stopped weimo-douban.service - Weimo Douban API."
+    ],
+    [
+      "2026-11-01T12:19:54.673838+08:00",
+      "Started weimo-douban.service - Weimo Douban API."
+    ],
+    [
+      "2026-11-01T15:59:02.892968+08:00",
+      "Stopped weimo-douban.service - Weimo Douban API."
+    ],
+    [
+      "2026-11-01T15:59:02.909965+08:00",
+      "Started weimo-douban.service - Weimo Douban API."
+    ],
+    [
+      "2026-11-01T16:28:04.791408+08:00",
+      "Stopped weimo-douban.service - Weimo Douban API."
+    ],
+    [
+      "2026-11-01T16:28:04.813842+08:00",
+      "Started weimo-douban.service - Weimo Douban API."
+    ],
+    [
+      "2026-11-01T17:58:05.896758+08:00",
+      "Stopped weimo-douban.service - Weimo Douban API."
+    ],
+    [
+      "2026-11-01T17:58:05.918015+08:00",
+      "Started weimo-douban.service - Weimo Douban API."
+    ]
+  ],
+  "daily_events": {
+    "2026-10-30": {
+      "success:book": 47,
+      "success:movie": 227,
+      "failure:movie": 19
+    },
+    "2026-10-31": {
+      "success:movie": 178,
+      "failure:movie": 38
+    },
+    "2026-11-01": {
+      "success:book": 869,
+      "success:music": 1961,
+      "success:movie": 499,
+      "failure:movie": 46
+    },
+    "2026-11-02": {
+      "success:movie": 336,
+      "failure:movie": 57
+    }
+  },
+  "longest_success_gap": {
+    "from": "2026-10-31T06:35:32.071019+08:00",
+    "to": "2026-11-01T13:09:36.868859+08:00",
+    "seconds": 110044.798
+  },
+  "nginx_events": [
+    {
+      "at": "2026-11-02T09:52:06+08:00",
+      "method": "POST",
+      "path": "/douban-admin/api/v1/subjects/jobs/clear",
+      "status": 200,
+      "response_bytes": 16,
+      "response_body_retained": false
+    },
+    {
+      "at": "2026-11-02T09:52:11+08:00",
+      "method": "GET",
+      "path": "/douban-admin/api/v1/subjects/jobs?state=error&page=1&page_size=20",
+      "status": 200,
+      "response_bytes": 134
+    }
+  ],
+  "subscription_coverage": {
+    "enabled_subscriptions": [
+      {
+        "uid": "wenjun30",
+        "full_interval_seconds": 86400,
+        "next_full_at": "2026-11-02T16:39:05.173+08:00",
+        "missing_current_subjects": 0
+      }
+    ],
+    "missing_by_user": [
+      {
+        "uid": "145680993",
+        "category": "movie",
+        "missing_subjects": 1983,
+        "subscription_enabled": false
+      }
+    ]
+  },
+  "failure_recovery_by_subject": [
+    {
+      "subject": "movie/11636422",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T16:13:22.927293+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/12009516",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T16:19:03.949682+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1291853",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T16:28:55.274065+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1292063",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T16:36:06.164259+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1292271",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T16:42:49.350752+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1292286",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T16:49:05.602321+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1292401",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T16:58:11.420222+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1292658",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T17:09:06.842860+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1293173",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T17:26:33.319940+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1293590",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T17:37:35.592698+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1293852",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T17:47:54.258027+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1294252",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T17:56:14.935670+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1294421",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T18:02:28.611845+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1294444",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T18:08:36.462474+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1294693",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T18:16:35.328837+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1294941",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T18:25:42.974217+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1295644",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T18:36:31.707318+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1295873",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T18:48:04.049561+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1296996",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T19:05:48.593612+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1298070",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T19:16:11.637424+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1298917",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T19:26:31.139297+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1299288",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-10-30T20:49:35.256802+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": "2026-10-31T05:07:01.014638+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/1299292",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T19:33:46.694445+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1299337",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T19:39:40.022420+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1300186",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T19:56:53.913567+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1300912",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T20:08:26.526354+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1301753",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T20:19:12.240185+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1302133",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T20:27:48.123062+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1302476",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T20:37:55.601775+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1303345",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T20:55:39.734833+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1303637",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T21:06:13.999565+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1304489",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T21:15:35.252991+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1304826",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T21:23:53.388033+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1304879",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T21:29:44.364620+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1306346",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T21:46:58.240964+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1307023",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T21:58:33.692192+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1307394",
+      "failure_count": 2,
+      "failure_times": [
+        "2026-10-30T20:57:33.476560+08:00",
+        "2026-10-31T05:07:01.052371+08:00"
+      ],
+      "max_logged_attempt": 2,
+      "later_success_time": "2026-10-31T06:32:51.787816+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/1307708",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T22:09:17.209556+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1308078",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T22:17:54.440403+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1308447",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T22:28:03.591247+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1308804",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T22:45:47.632538+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1309163",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T22:56:20.294298+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1382621",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T23:05:40.563984+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1394424",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T23:13:56.382022+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1394510",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T23:19:48.864424+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1395091",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-10-30T21:04:42.266167+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": "2026-10-31T05:14:23.300097+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/1401477",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T23:37:03.845518+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1417036",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T23:48:39.329872+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1419926",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-01T23:59:23.047858+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1421823",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T00:08:00.761835+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1427869",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T00:18:07.859983+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1431962",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T00:35:50.025171+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1438759",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T00:46:25.346903+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1441238",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-10-30T21:11:26.744267+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": "2026-10-31T05:15:36.842796+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/1441644",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T00:55:43.105207+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1441802",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-10-30T21:17:35.775585+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": "2026-10-31T05:16:43.319387+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/1448703",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T01:03:07.023371+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1448784",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T01:08:53.185267+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1455811",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T01:18:34.792983+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1457573",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T01:28:17.983200+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1461403",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T01:38:00.160395+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1462703",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T01:47:43.618214+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1464338",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T01:57:25.570012+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1464840",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T02:07:07.145763+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1465037",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T02:16:49.180562+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1465325",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T02:26:37.051772+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1465790",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T02:35:38.011826+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1466115",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T02:45:37.544373+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1471438",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T02:54:38.591707+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1474591",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T02:59:56.885634+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1477963",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T03:09:38.596798+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1481065",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T03:19:20.519229+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1482286",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T03:29:03.222111+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1483646",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T03:38:45.750481+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1498675",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T03:48:28.327546+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1547087",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T03:58:10.798975+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1547091",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T04:07:53.714636+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1548755",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T04:17:36.279012+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1548786",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T04:27:18.783339+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1578714",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T04:37:00.990914+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1729037",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T04:46:43.170836+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1759386",
+      "failure_count": 2,
+      "failure_times": [
+        "2026-10-30T21:26:43.133814+08:00",
+        "2026-10-31T05:16:43.352065+08:00"
+      ],
+      "max_logged_attempt": 2,
+      "later_success_time": "2026-10-31T06:33:22.261475+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/1760027",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T04:55:43.641185+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1761854",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T05:05:44.105975+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1764730",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T05:15:44.030479+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1770980",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T05:24:43.826239+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1777361",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T05:34:43.615735+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1782004",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T05:44:44.629832+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1786739",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T05:54:44.299319+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1788622",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T06:06:27.665430+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1796053",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T06:18:29.478775+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1845625",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T06:35:58.035167+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1855131",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T06:47:05.079193+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1864236",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T06:57:22.117919+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1865703",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-10-30T21:37:37.707720+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": "2026-10-31T05:24:05.013414+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/1887000",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T07:05:43.802985+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1900841",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T07:14:47.127598+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1917796",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T07:25:58.482317+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1922161",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T07:38:30.879811+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1958952",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T07:56:01.127599+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/1986021",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T08:07:08.902149+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/19973780",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T08:17:25.172295+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/19998197",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T08:25:45.091773+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/2004001",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T08:34:51.429658+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/2024504",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T08:46:02.132434+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/20274039",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T08:58:34.340966+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/20376577",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T09:16:03.122550+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/2043283",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T09:26:12.958334+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/2053515",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T09:36:30.645144+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/2063950",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-11-02T09:44:33.183916+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": null,
+      "present_in_subjects": false,
+      "present_in_jobs": false
+    },
+    {
+      "subject": "movie/2133201",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-10-30T21:55:21.285471+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": "2026-10-31T05:25:19.095891+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/22759752",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-10-30T22:05:52.720267+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": "2026-10-31T05:26:25.781669+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/24879839",
+      "failure_count": 2,
+      "failure_times": [
+        "2026-10-30T22:15:45.311435+08:00",
+        "2026-10-31T05:26:25.817657+08:00"
+      ],
+      "max_logged_attempt": 2,
+      "later_success_time": "2026-10-31T06:33:49.508100+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/25777636",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-10-30T22:23:54.322014+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": "2026-10-31T05:33:48.499684+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/25780651",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-10-30T22:29:54.471115+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": "2026-10-31T05:35:02.046962+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/25921812",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-10-30T22:46:51.633871+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": "2026-10-31T05:36:08.811223+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/26265962",
+      "failure_count": 2,
+      "failure_times": [
+        "2026-10-30T22:58:26.415563+08:00",
+        "2026-10-31T05:36:08.846524+08:00"
+      ],
+      "max_logged_attempt": 2,
+      "later_success_time": "2026-10-31T06:34:13.996789+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/26353324",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-10-30T23:09:23.796012+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": "2026-10-31T05:43:30.712484+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/26607693",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-10-30T23:17:17.777382+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": "2026-10-31T05:44:44.194919+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/26698000",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-10-30T23:27:27.311271+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": "2026-10-31T05:45:50.427615+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/26752852",
+      "failure_count": 2,
+      "failure_times": [
+        "2026-10-30T23:39:51.616624+08:00",
+        "2026-10-31T05:45:50.460594+08:00"
+      ],
+      "max_logged_attempt": 2,
+      "later_success_time": "2026-10-31T06:34:36.738142+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/26958502",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-10-30T23:56:58.224093+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": "2026-10-31T05:53:12.672049+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/27092785",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-10-31T00:08:30.479233+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": "2026-10-31T05:54:26.775459+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/3005387",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-10-31T00:19:29.167561+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": "2026-10-31T05:55:33.691592+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/30176790",
+      "failure_count": 2,
+      "failure_times": [
+        "2026-10-31T00:27:19.913670+08:00",
+        "2026-10-31T05:55:33.727700+08:00"
+      ],
+      "max_logged_attempt": 2,
+      "later_success_time": "2026-10-31T06:34:57.467485+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/30331149",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-10-31T00:37:26.516658+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": "2026-10-31T06:02:55.718954+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/30355664",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-10-31T00:49:52.923247+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": "2026-10-31T06:04:09.060243+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/3075287",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-10-31T01:04:41.172467+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": "2026-10-31T06:05:16.139049+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/3240208",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-10-31T01:17:07.037287+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": "2026-10-31T06:06:16.023441+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/33456512",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-10-31T01:29:32.153469+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": "2026-10-31T06:07:10.230202+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/35206308",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-10-31T01:38:27.539628+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": "2026-10-31T06:07:59.027746+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/35297263",
+      "failure_count": 2,
+      "failure_times": [
+        "2026-10-31T01:48:28.207542+08:00",
+        "2026-10-31T06:07:59.061529+08:00"
+      ],
+      "max_logged_attempt": 2,
+      "later_success_time": "2026-10-31T06:35:15.489152+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/35689244",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-10-31T01:57:28.213027+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": "2026-10-31T06:15:18.567394+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/35766491",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-10-31T02:07:09.798238+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": "2026-10-31T06:16:32.682362+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/36053104",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-10-31T02:16:52.567266+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": "2026-10-31T06:17:39.271249+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/36151693",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-10-31T02:26:35.140266+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": "2026-10-31T06:18:39.191639+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/36289263",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-10-31T02:36:17.512889+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": "2026-10-31T06:19:33.182141+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/36464801",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-10-31T02:45:59.556696+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": "2026-10-31T06:20:21.499753+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/36812879",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-10-31T02:55:41.386962+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": "2026-10-31T06:21:05.692782+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/36901008",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-10-31T03:05:23.441717+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": "2026-10-31T06:21:44.780410+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/36934908",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-10-31T03:15:06.107884+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": "2026-10-31T06:22:20.875668+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/37242440",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-10-31T03:24:47.826663+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": "2026-10-31T06:22:53.429316+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/37508847",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-10-31T03:34:30.656380+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": "2026-10-31T06:23:21.884762+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/4135434",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-10-31T03:44:14.106677+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": "2026-10-31T06:23:47.731239+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/4319218",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-10-31T03:53:56.284858+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": "2026-10-31T06:24:11.064420+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/4719384",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-10-31T03:59:56.432712+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": "2026-10-31T06:24:32.304278+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/4850393",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-10-31T04:09:35.321080+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": "2026-10-31T06:24:51.594182+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/5044737",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-10-31T04:19:35.437340+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": "2026-10-31T06:25:09.282934+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/5996801",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-10-31T04:29:35.237610+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": "2026-10-31T06:25:25.155602+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/6386345",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-10-31T04:38:35.271258+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": "2026-10-31T06:25:39.752119+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/6536180",
+      "failure_count": 2,
+      "failure_times": [
+        "2026-10-31T04:47:35.702606+08:00",
+        "2026-10-31T06:25:39.785260+08:00"
+      ],
+      "max_logged_attempt": 2,
+      "later_success_time": "2026-10-31T06:35:32.071019+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    },
+    {
+      "subject": "movie/6879185",
+      "failure_count": 1,
+      "failure_times": [
+        "2026-10-31T04:57:18.246868+08:00"
+      ],
+      "max_logged_attempt": 1,
+      "later_success_time": "2026-10-31T06:32:18.047385+08:00",
+      "present_in_subjects": true,
+      "present_in_jobs": true
+    }
+  ]
+}

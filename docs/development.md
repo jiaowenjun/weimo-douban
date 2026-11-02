@@ -65,3 +65,4 @@ curl -H 'Authorization: Bearer replace-with-your-token' \
 
 - [豆瓣 API 调研](research/豆瓣API调研报告.md)
 - [豆瓣源依赖性与限制](research/豆瓣源依赖性与脆弱性分析.md)
+- [txy 富集任务执行报告与经验总结（2026-11-02）](research/2026-11-02-txy富集任务执行报告与经验总结.md)
