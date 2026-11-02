@@ -48,14 +48,16 @@ export function useUserProfile(uid: string | null | undefined): UserProfile | nu
   return profile;
 }
 
-/** 用户头像图：经本地封面代理加载（豆瓣头像域浏览器直连 418），无资料时回退图标 */
+/** 用户头像图：经本地封面代理加载（豆瓣头像域浏览器直连 418）；有用户名但
+ *  无头像或图裂时显示首字，无资料时回退图标——rc-avatar 的回退顺序是
+ *  icon 先于 children，icon 恒传会吞掉首字，故仅在无用户名时传入。 */
 export function UserAvatar({ uid, size = 24 }: { uid: string | null | undefined; size?: number }) {
   const profile = useUserProfile(uid);
   return (
     <Avatar
       size={size}
       src={profile?.avatar ? resolveApiUrl(profile.avatar) : undefined}
-      icon={<UserOutlined />}
+      icon={profile?.username ? undefined : <UserOutlined />}
     >
       {profile?.username ? profile.username.slice(0, 1) : undefined}
     </Avatar>

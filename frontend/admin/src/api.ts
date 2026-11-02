@@ -29,23 +29,19 @@ export const getToken = () => localStorage.getItem(TOKEN_KEY) || '';
 export const setToken = (v: string) => localStorage.setItem(TOKEN_KEY, v);
 
 /** 解析服务端返回的相对 API 路径（如 /api/v1/covers?...）为可请求的地址。
- *  API base 为跨源完整地址时（dist 静态部署 + CORS），相对路径会错误地落在前端
- *  自己的 origin 上，需按 base 的 origin 解析；开启鉴权时 img 标签带不了
- *  Authorization 头，追加 ?token= 查询参数兜底（服务端已支持）。 */
+ *  后端固定返回 /api/v1 前缀的相对路径，须重写为 API base 同前缀路径——
+ *  按 location.origin 解析在生产子路径部署（/douban-admin）下会丢部署前缀，
+ *  落到根路径 /api/ 上（nginx 无此路由，404 裂图）；字符串拼接对相对 base
+ *  与跨源完整 base 同样成立。开启鉴权时 img 标签带不了 Authorization 头，
+ *  追加 ?token= 查询参数兜底（服务端已支持）。同 web 站点 api.ts 实现。 */
 export function resolveApiUrl(path: string): string {
-  if (!path || !path.startsWith('/')) return path;
-  const base = getApiBase();
-  let url: URL;
-  try {
-    url = new URL(path, /^https?:\/\//.test(base) ? base : window.location.origin);
-  } catch {
-    return path;
-  }
+  if (!path || !path.startsWith('/api/v1')) return path;
+  let url = getApiBase() + path.slice('/api/v1'.length);
   const token = getToken();
-  if (token && !url.searchParams.has('token')) {
-    url.searchParams.set('token', token);
+  if (token && !url.includes('token=')) {
+    url += (url.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(token);
   }
-  return url.href;
+  return url;
 }
 
 /** 与服务端 backend/src/crawler.rs::parse_uid 一致：接受纯 ID 或个人主页链接，归一化为纯 uid。
