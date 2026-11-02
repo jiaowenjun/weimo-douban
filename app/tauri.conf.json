@@ -28,6 +28,12 @@
     "shortDescription": "微墨·豆瓣——书影音同步与浏览（内嵌本地服务器）",
     "macOS": {
       "infoPlist": "Info.plist"
+    },
+    "windows": {
+      "nsis": {
+        "installerIcon": "icons/icon-installer.ico",
+        "uninstallerIcon": "icons/icon-installer.ico"
+      }
     }
   },
   "plugins": {

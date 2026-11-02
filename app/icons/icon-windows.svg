@@ -7,7 +7,11 @@
        再生方式：rsvg-convert -w N -h N icon-windows.svg 逐尺寸出 PNG
        （N=16/24/32/48/64/256，与 pnpm tauri icon 生成的 icon.ico 条目集一致），
        再以 Pillow 按 PNG 条目打包回 icons/icon.ico（勿跑 pnpm tauri icon，
-       会以满出血方形源稿覆盖回直角 ico） -->
+       会以满出血方形源稿覆盖回直角 ico）。
+       另衍生 icons/icon-installer.ico（NSIS 安装器/卸载器本体图标，BMP 条目
+       编码——makensis 解不了 PNG 条目 ico；不配 bundle.windows.nsis.installerIcon
+       时 tauri 模板不给 NSIS 传 MUI_ICON、安装器会露 NSIS 默认圆徽章，v0.5.3/0.5.4
+       实测）——改稿后跑 scripts/pack-installer-ico.py 重打包 -->
   <defs>
     <clipPath id="rounded">
       <rect width="1024" height="1024" rx="230.4"/>
