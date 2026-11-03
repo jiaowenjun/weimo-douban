@@ -1,6 +1,7 @@
 //! 微墨·豆瓣书影音 macOS 桌面 App——Tauri 壳 + 内嵌 weimo-douban 同步服务器。
 //!
-//! 架构（全栈单进程）：启动时在回环随机端口拉起 `weimo_douban::server`
+//! 架构（全栈单进程）：启动时在回环端口（固定优先，见 APP_PORT_CANDIDATES）
+//! 拉起 `weimo_douban::server`
 //! （API + 抓取/富集/订阅后台任务），前端静态资源（frontend/web 构建产物，
 //! vite base=/douban/）经 rust-embed 编进二进制、由同一个 axum 在 /douban/
 //! 前缀下服务（与线上 weimo.ink/douban/ 的 URL 结构一致，前端零改动），
@@ -33,6 +34,17 @@ use weimo_douban::server::config::ServerConfig;
 
 /// 前端静态资源挂载前缀（与生产站点 weimo.ink/douban/ 及 vite base 一致）
 const WEB_MOUNT: &str = "/douban";
+
+/// 回环服务端口候选（按序尝试，全部被占才回退随机端口）。
+///
+/// localStorage/IndexedDB 按源隔离且端口属于源：随机端口会让每次启动落在
+/// 全新源上，登录豆瓣 ID/站点设置/查询缓存（按 location.origin 存取）全部
+/// 读不回——重启后要求重新输入豆瓣 ID 的根因。首选固定端口让源跨启动稳定，
+/// 持久化得以延续；被占时按序回退，候选列表内的端口同样稳定（占用者存续
+/// 期间源不变）；全忙才退回随机，仅该次会话丢持久化，下次自动恢复。端口
+/// 取 49152（macOS/Windows 临时端口区下界）以下、避开常见服务端口的区间；
+/// SYNC_APP_PORT 可注入自定义首选（联调/排障用）。
+const APP_PORT_CANDIDATES: [u16; 3] = [39217, 39218, 39219];
 
 /// 更新 manifest 默认端点（按序回退）：Gitee 国内源优先——主要用户群在
 /// 大陆，GitHub 直连常不可达；数据源 = 仓库 app-latest 分支的 latest.json
@@ -85,13 +97,27 @@ fn main() {
         .setup(|app| {
             build_tray(app.handle())?;
 
-            // 先把回环随机端口绑定到手（backlog 生效，后续连接不会拒绝），
+            // 先把回环端口绑定到手（backlog 生效，后续连接不会拒绝），
             // 服务装配在后台任务里做，完成后才创建窗口
             let listener = tauri::async_runtime::block_on(async {
-                let listener = tokio::net::TcpListener::bind("127.0.0.1:0")
-                    .await
-                    .context("绑定回环端口失败")?;
-                anyhow::Ok(listener)
+                let mut candidates: Vec<u16> =
+                    env_or("SYNC_APP_PORT", "").parse::<u16>().ok().into_iter().collect();
+                candidates.extend(APP_PORT_CANDIDATES);
+                // 末位随机兜底：端口 0 由 OS 分配，实际不会失败
+                candidates.push(0);
+                let mut bound: Option<tokio::net::TcpListener> = None;
+                for port in candidates {
+                    match tokio::net::TcpListener::bind(("127.0.0.1", port)).await {
+                        Ok(listener) => {
+                            bound = Some(listener);
+                            break;
+                        }
+                        Err(error) => {
+                            tracing::debug!(port, %error, "回环端口被占，尝试下一候选");
+                        }
+                    }
+                }
+                bound.context("绑定回环端口失败（含随机兜底）")
             })?;
 
             let handle = app.handle().clone();

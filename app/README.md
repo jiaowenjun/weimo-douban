@@ -26,8 +26,12 @@ weimo.ink 也可工作。
   URL 结构完全一致。
 - **版本原子性**：dist 经 rust-embed 编进二进制，App = 整栈快照，
   `cache_version` 协议前后端永远同版（与 txy 原子符号链接部署同构）。
-- **回环随机端口**：setup 里先 `TcpListener::bind("127.0.0.1:0")` 把端口
-  绑定到手（backlog 生效，后续连接不会拒绝）；仅回环监听、token 留空。
+- **回环固定优先端口**：setup 里先 `TcpListener::bind` 把端口绑定到手
+  （backlog 生效，后续连接不会拒绝）——候选 `APP_PORT_CANDIDATES`
+  （39217-39219，`SYNC_APP_PORT` 可注入自定义首选）按序尝试，全忙才回退
+  随机。固定优先是为了源（scheme+host+port）跨启动稳定：localStorage/
+  IndexedDB 按源隔离，随机端口会让登录豆瓣 ID/站点设置/查询缓存每次
+  启动全部读不回。仅回环监听、token 留空。
 - **单实例**（tauri-plugin-single-instance）：二次启动聚焦既有窗口，
   避免两个进程写同一 SQLite。
 
