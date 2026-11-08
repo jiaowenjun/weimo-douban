@@ -51,6 +51,39 @@ jobs:
           pnpm --dir frontend/web install --frozen-lockfile
           pnpm --dir app install --frozen-lockfile
 
+      # GitHub release CDN 对部分资产持续 504（2026-11-08 实测 nsis-3.13.zip 与
+      # nsis_tauri_utils-v0.5.3.dll 先后在 runner 与本地不可达）——tauri bundler
+      # 仅在「NSIS 目录齐全且哈希匹配」时才跳过下载，故构建前经 gh api 资产通道
+      # （不受 CDN 故障影响）预置整套工具集：zip 解压到 %LOCALAPPDATA%\tauri 后
+      # 把 nsis-3.13/ 改名为 NSIS/（与 bundler 的 extract+rename 完全同构），DLL
+      # 放 Plugins/x86-unicode/additional/，双 SHA1 对齐 bundler 内置常量即完全
+      # 离线。解压用 System32 的 bsdtar（原生支持 zip；Git Bash 自带的是 GNU
+      # tar 不认）。常量对应 pnpm-lock 解析的 @tauri-apps/cli 2.12.4（tauri-
+      # bundler 的 NSIS_SHA1 / NSIS_TAURI_UTILS_SHA1）；升级 CLI 时须同步更新
+      # tag、目录名与两个 SHA1。
+      - name: 预置 NSIS 工具集（绕过 release CDN 504）
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TOOLS="$(cygpath -u "$LOCALAPPDATA")/tauri"
+          ZIP="$RUNNER_TEMP/nsis-3.13.zip"
+          mkdir -p "$TOOLS"
+          ZIP_ASSET=$(gh api repos/tauri-apps/binary-releases/releases/tags/nsis-3.13 \
+            --jq '.assets[] | select(.name=="nsis-3.13.zip") | .id')
+          gh api "repos/tauri-apps/binary-releases/releases/assets/$ZIP_ASSET" \
+            -H "Accept: application/octet-stream" > "$ZIP"
+          echo "DB14F8AF2EA346B786C6AE19343F61AAF5E09B8E  $ZIP" | sha1sum -c -
+          /c/Windows/System32/tar.exe -xf "$ZIP" -C "$(cygpath -w "$TOOLS")"
+          mv "$TOOLS/nsis-3.13" "$TOOLS/NSIS"
+          DLL="$TOOLS/NSIS/Plugins/x86-unicode/additional/nsis_tauri_utils.dll"
+          mkdir -p "$(dirname "$DLL")"
+          ASSET=$(gh api repos/tauri-apps/nsis-tauri-utils/releases/tags/nsis_tauri_utils-v0.5.3 \
+            --jq '.assets[0].id')
+          gh api "repos/tauri-apps/nsis-tauri-utils/releases/assets/$ASSET" \
+            -H "Accept: application/octet-stream" > "$DLL"
+          echo "75197FEE3C6A814FE035788D1C34EAD39349B860  $DLL" | sha1sum -c -
+
       - name: 构建 Windows App（含 updater 签名产物）
         shell: bash
         env:
