@@ -241,8 +241,8 @@ export const api = {
       },
     ),
 
-  /** 批量重排：failed（重试失败终态）/ not_found（重试已删除条目）/ stale（强制重抓过期条目） */
-  requeueSubjectJobs: (scope: 'failed' | 'not_found' | 'stale', category?: string) =>
+  /** 批量重排：failed（重试失败终态）/ not_found（重试已删除条目）/ stale（强制重抓过期条目）/ intro（无条件重抓 intro 兜底降级行） */
+  requeueSubjectJobs: (scope: 'failed' | 'not_found' | 'stale' | 'intro', category?: string) =>
     request<{ queued: number }>('/subjects/jobs/requeue', {
       method: 'POST',
       body: JSON.stringify({ scope, category }),

@@ -1003,7 +1003,8 @@ async fn restore_enrichment(
 #[derive(serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 struct RequeueJobsReq {
-    /// failed（重试 error 终态）/ not_found（重试已删除条目）/ stale（强制重抓过期条目）
+    /// failed（重试 error 终态）/ not_found（重试已删除条目）/ stale（强制重抓过期条目）/
+    /// intro（无条件强制重抓 source='intro' 兜底降级行）
     scope: String,
     #[serde(default)]
     category: Option<String>,
@@ -1015,9 +1016,9 @@ async fn requeue_subject_jobs(
 ) -> AppResult<Json<Value>> {
     let req: RequeueJobsReq =
         serde_json::from_slice(&body).map_err(|e| AppError::InvalidArgument(e.to_string()))?;
-    if !["failed", "not_found", "stale"].contains(&req.scope.as_str()) {
+    if !["failed", "not_found", "stale", "intro"].contains(&req.scope.as_str()) {
         return Err(AppError::InvalidArgument(
-            "非法 scope（允许值: failed/not_found/stale）".to_string(),
+            "非法 scope（允许值: failed/not_found/stale/intro）".to_string(),
         ));
     }
     if let Some(c) = req

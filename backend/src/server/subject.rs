@@ -758,7 +758,9 @@ pub async fn clear_jobs(
 /// - failed / not_found：对应终态 job 重新排队（priority=0 插队；not_found 多为
 ///   条目被豆瓣删除，重排仅在怀疑误判时使用）；
 /// - stale：subjects 中已过 TTL 的条目强制重抓（priority=0 绕过缓存命中，仍遵守暂停/冷却）——
-///   这是"重新抓取库中已有条目"唯一的批量入口。
+///   这是"重新抓取库中已有条目"唯一的批量入口；
+/// - intro：subjects 中 source='intro' 的兜底降级行无条件强制重抓（priority=0，不依赖
+///   TTL）——admin「重排 intro 兜底」一键升级入口，rexxar 成功后覆盖回权威行。
 pub async fn requeue_jobs(state: &AppState, scope: &str, category: Option<&str>) -> Result<u64> {
     let now = ServerConfig::now_ms();
     let category = category.filter(|c| !c.is_empty() && *c != "all");
@@ -803,6 +805,29 @@ pub async fn requeue_jobs(state: &AppState, scope: &str, category: Option<&str>)
                    WHERE subject_jobs.state NOT IN ('queued','running')",
             );
             let mut query = sqlx::query(&sql).bind(now).bind(now).bind(stale_before);
+            if let Some(c) = category {
+                query = query.bind(c);
+            }
+            query.execute(&mut *tx).await?.rows_affected()
+        }
+        // intro 兜底行无条件重排（不依赖 TTL）；priority=0 同 stale——intro 行已在
+        // subjects 中，非强制 job 会被执行守卫的缓存命中直接跳过
+        "intro" => {
+            let mut sql = String::from(
+                "INSERT INTO subject_jobs (category, subject_id, state, priority, created_ms, updated_ms)
+                 SELECT category, subject_id, 'queued', 0, ?, ? FROM subjects
+                 WHERE source = 'intro'",
+            );
+            if has_category {
+                sql.push_str(" AND category = ?");
+            }
+            sql.push_str(
+                " ON CONFLICT(category, subject_id) DO UPDATE SET \
+                   state='queued', attempts=0, next_run_ms=NULL, last_error=NULL, \
+                   priority=0, retry_since_ms=NULL, run_token=NULL, updated_ms=excluded.updated_ms \
+                   WHERE subject_jobs.state NOT IN ('queued','running')",
+            );
+            let mut query = sqlx::query(&sql).bind(now).bind(now);
             if let Some(c) = category {
                 query = query.bind(c);
             }

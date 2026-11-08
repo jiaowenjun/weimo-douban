@@ -105,7 +105,7 @@ Base URL：`http://{host}:8080/api/v1`（默认端口 8080，可配置）
 | 11a | GET | `/subjects/jobs` | 富集任务列表（状态过滤/搜索/分页 + 各状态计数） |
 | 11b | DELETE | `/subjects/jobs/{category}/{subject_id}` | 删除单个富集任务（queued 即取消） |
 | 11c | POST | `/subjects/jobs/clear` | 按状态批量删除任务（中断队列 = queued+running） |
-| 11d | POST | `/subjects/jobs/requeue` | 批量重排（failed / not_found / stale 强制重抓过期） |
+| 11d | POST | `/subjects/jobs/requeue` | 批量重排（failed / not_found / stale 强制重抓过期 / intro 无条件重抓兜底降级行） |
 | 12 | GET | `/covers?u={url}` | 豆瓣封面/头像白名单代理（cache-then-serve，见 4.11） |
 | 13 | GET | `/subscriptions` | 订阅列表 |
 | 14 | PUT | `/subscriptions/{uid}` | 创建/更新订阅（RSS 增量 + 定时全量） |
@@ -486,13 +486,13 @@ GET /api/v1/users/{uid}/profile
 - **GET /subjects/jobs?state=&category=&q=&page=&page_size=** → 分页列出富集 job；state 支持逗号分隔多值（queued/running/ok/error/not_found，缺省全部），q 匹配条目 ID / 已富集标题 / 任一用户标记行标题；标题与封面优先取 subjects、未富集回退 records；响应附各状态 `counts` 与 `counts_total`，条目含 `forced`（priority=0 显式强制）与 `stale`（已过 TTL）标记；排序活动状态（running/queued）在前。
 - **DELETE /subjects/jobs/{category}/{subject_id}** → 204：删除单个 job（任意状态）。queued 即取消该条目；终态失败 job 删除后可在下次同步重新入队；不存在 404 `JOB_NOT_FOUND`。
 - **POST /subjects/jobs/clear** body `{"states": ["queued","running"], "category": "movie"?}` → `{"deleted": N}`：按状态批量删除。**中断队列 = states ["queued","running"]**；正在抓取的一条（单 worker 至多一个）会完成并把结果写库，仅 job 行消失；category 可选（缺省/all 为全部）。
-- **POST /subjects/jobs/requeue** body `{"scope": "failed"|"not_found"|"stale", "category": …}` → `{"queued": N}`：failed / not_found 把对应终态 job 重排（attempts 清零、priority=0 插队）；**stale 为强制重抓库中已过 TTL 条目——"重新抓取已有条目"的唯一批量入口**（priority=0 绕过执行守卫；已在排队/执行中的 job 不被重置，幂等）。
+- **POST /subjects/jobs/requeue** body `{"scope": "failed"|"not_found"|"stale"|"intro", "category": …}` → `{"queued": N}`：failed / not_found 把对应终态 job 重排（attempts 清零、priority=0 插队）；**stale 为强制重抓库中已过 TTL 条目**（priority=0 绕过执行守卫；已在排队/执行中的 job 不被重置，幂等）；**intro 为无条件强制重抓 `source='intro'` 兜底降级行**（2026-11-04 增，不受 TTL 限制，admin「重排 intro 兜底」一键升级入口，rexxar 成功后覆盖回权威行）——stale/intro 是"重新抓取已有条目"仅有的两个批量入口。
 
-**跳过语义（核心行为变更）**：worker 执行富集 job 前有守卫——subjects 已有该条目且 job 非显式强制（priority≠0）→ 跳过，不发请求、直接标记完成且不改写库中数据。配合入队侧只入缺失条目，保证「库中已有 → 零请求」在任何入队路径下成立；重抓必须显式触发（单条 refresh / 批量 requeue scope=stale）。`SYNC_SUBJECT_TTL_SECS` 语义相应调整：不再驱动自动重抓，仅定义"过期"阈值（stale 标记与 requeue scope=stale 的范围）。
+**跳过语义（核心行为变更）**：worker 执行富集 job 前有守卫——subjects 已有该条目且 job 非显式强制（priority≠0）→ 跳过，不发请求、直接标记完成且不改写库中数据。配合入队侧只入缺失条目，保证「库中已有 → 零请求」在任何入队路径下成立；重抓必须显式触发（单条 refresh / 批量 requeue scope=stale 或 scope=intro）。`SYNC_SUBJECT_TTL_SECS` 语义相应调整：不再驱动自动重抓，仅定义"过期"阈值（stale 标记与 requeue scope=stale 的范围）。
 
 **marks 扩展**：`GET /users/{uid}/marks?…&expand=subject`，items 每项追加 `subject` 对象：已富集返回 rexxar 视图（`source:"rexxar"`，含豆瓣评分）；**未富集回退 intro 启发式解析合成视图（`source:"intro"`，无豆瓣评分、fetched_at 为 null）**，不再为 `null`；不传 expand 响应结构与旧版完全一致。intro 解析器为 intro汇总/intro_parser.py 的 Rust 移植（backend/src/intro.rs），291 例黄金用例与 Python 共享基准。`/syncs/{id}/result` 的 summary 附带全局 `subjects_enriched` / `subjects_pending` 计数。
 
-**行为要点**：富集只存封面 URL（`cover_url`，rexxar 中图规格，比收藏页 `records.cover` 小图清晰），图片字节仍由 `/covers` 代理按需回源缓存，两者分工详见《条目元信息富集方案.md》§12；维度抓取完成后自动按"集合差 + INSERT OR IGNORE"入队**缺失**条目（subjects 已有的不重抓，重抓需显式触发，见上方「跳过语义」）；**rexxar 端点限流应对**（2026-10-28 实测 movie 端点连发 4-8 个即 400 封锁 5-6 分钟、music/book 宽松）：按类别 AIMD 自适应限速（限流 ×3 上限 90s / 成功 ×0.9 回落）+ 一次 4xx/404 即类别冷却（`SYNC_SUBJECT_CATEGORY_COOLDOWN_SECS` 默认 300s，同类非强制 job 全部推迟，不再把全局熔断每 10 分钟拖停一轮）+ 指数退避（20s·3^(n-1)）；**重试耗尽（5 次）落 intro 兜底**：以 records.intro 合成降级行写 subjects（`source:"intro"`，无豆瓣评分、标题/封面取标记行、年份等 intro 解析），job 置 ok 终结重试链，`counts.intro_fallback` 计数与 admin「intro 兜底」标记可见，可单条 refresh 或 requeue scope=stale 升级回权威数据；records 无该条目（理论不可达）维持 `error` 终态。富集与页面抓取共享单 worker 串行限速与熔断，rexxar 相邻请求另有 `SYNC_SUBJECT_MIN_INTERVAL_SECS`（默认 3s）下限；404 条目终态 `not_found` 不重试（404 同样累积触发端点封锁，亦做类别冷却但不计熔断）；`SYNC_SUBJECT_ENRICH=false` 一键关闭回到纯 intro 行为。
+**行为要点**：富集只存封面 URL（`cover_url`，rexxar 中图规格，比收藏页 `records.cover` 小图清晰），图片字节仍由 `/covers` 代理按需回源缓存，两者分工详见《条目元信息富集方案.md》§12；维度抓取完成后自动按"集合差 + INSERT OR IGNORE"入队**缺失**条目（subjects 已有的不重抓，重抓需显式触发，见上方「跳过语义」）；**rexxar 端点限流应对**（2026-10-28 实测 movie 端点连发 4-8 个即 400 封锁 5-6 分钟、music/book 宽松）：按类别 AIMD 自适应限速（限流 ×3 上限 90s / 成功 ×0.9 回落）+ 一次 4xx/404 即类别冷却（`SYNC_SUBJECT_CATEGORY_COOLDOWN_SECS` 默认 300s，同类非强制 job 全部推迟，不再把全局熔断每 10 分钟拖停一轮）+ 指数退避（20s·3^(n-1)）；**重试耗尽（5 次）落 intro 兜底**：以 records.intro 合成降级行写 subjects（`source:"intro"`，无豆瓣评分、标题/封面取标记行、年份等 intro 解析），job 置 ok 终结重试链，`counts.intro_fallback` 计数与 admin「intro 兜底」标记可见，可单条 refresh 或 requeue scope=stale/intro 升级回权威数据；records 无该条目（理论不可达）维持 `error` 终态。富集与页面抓取共享单 worker 串行限速与熔断，rexxar 相邻请求另有 `SYNC_SUBJECT_MIN_INTERVAL_SECS`（默认 3s）下限；404 条目终态 `not_found` 不重试（404 同样累积触发端点封锁，亦做类别冷却但不计熔断）；`SYNC_SUBJECT_ENRICH=false` 一键关闭回到纯 intro 行为。
 
 ## 5. 数据模型
 

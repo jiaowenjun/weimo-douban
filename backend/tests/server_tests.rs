@@ -2716,6 +2716,68 @@ async fn subject_jobs_management_endpoints() {
         0
     );
 
+    // 重排 intro 兜底：source='intro' 行无条件强制重排（fetched_ms 新鲜，证明不依赖
+    // TTL）；rexxar 来源的 1292052（同样无 job 行）不被波及。真实形态下兜底行的
+    // job 为 ok 终态（重试耗尽后终结），故先种 ok/attempts=5 验证终态翻转。
+    sqlx::query(
+        "INSERT INTO subjects (category, subject_id, title, source, fetched_ms)
+         VALUES ('movie', '3006488', '海街日记', 'intro', ?)",
+    )
+    .bind(now)
+    .execute(&state.pool)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO subject_jobs (category, subject_id, state, attempts, priority,
+                                   created_ms, updated_ms, last_error)
+         VALUES ('movie', '3006488', 'ok', 5, 1, ?, ?, 'retries exhausted')",
+    )
+    .bind(now)
+    .bind(now)
+    .execute(&state.pool)
+    .await
+    .unwrap();
+    let (status, body) = request(
+        app.clone(),
+        Method::POST,
+        "/api/v1/subjects/jobs/requeue",
+        Some(r#"{"scope": "intro"}"#.to_string()),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["queued"], 1);
+    let (st, attempts, priority, last_error): (String, i64, i64, Option<String>) = sqlx::query_as(
+        "SELECT state, attempts, priority, last_error FROM subject_jobs
+         WHERE category='movie' AND subject_id='3006488'",
+    )
+    .fetch_one(&state.pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        (st.as_str(), attempts, priority, last_error.as_deref()),
+        ("queued", 0, 0, None)
+    );
+    assert_eq!(
+        count(
+            &state,
+            "SELECT COUNT(*) FROM subject_jobs WHERE category='movie' AND subject_id='1292052'"
+        )
+        .await,
+        0,
+        "rexxar 来源行（含过期的 1292052）不被 intro scope 波及"
+    );
+    // 再跑一次：已排队的不动（幂等，0 增量）
+    let (_, body) = request(
+        app.clone(),
+        Method::POST,
+        "/api/v1/subjects/jobs/requeue",
+        Some(r#"{"scope": "intro"}"#.to_string()),
+        None,
+    )
+    .await;
+    assert_eq!(body["queued"], 0, "已在排队的 job 不被重置");
+
     // 非法入参：空 states / 非法 scope
     let (status, _) = request(
         app.clone(),

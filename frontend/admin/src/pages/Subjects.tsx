@@ -16,7 +16,7 @@ import {
   Typography,
 } from 'antd';
 import { PageContainer } from '@ant-design/pro-components';
-import { CloudDownloadOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons';
+import { CloudDownloadOutlined, RedoOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import type { Subject, SubjectListResponse } from '../types';
 import { api, type ApiError } from '../api';
@@ -35,10 +35,14 @@ function ProgressCard({
   counts,
   onBackfill,
   backfilling,
+  onRequeueIntro,
+  requeuingIntro,
 }: {
   counts: SubjectListResponse['counts'] | null;
   onBackfill: () => void;
   backfilling: boolean;
+  onRequeueIntro: () => void;
+  requeuingIntro: boolean;
 }) {
   return (
     <Card size="small" style={{ marginBottom: 16 }}>
@@ -63,7 +67,7 @@ function ProgressCard({
             value={counts!.intro_fallback!}
             valueStyle={{ fontSize: 20 }}
             prefix={
-              <Tooltip title="rexxar 重试耗尽后由 records.intro 合成的降纔回答（无豆瓣评分）；可单条强制重排或「重抓过期」升级">
+              <Tooltip title="rexxar 重试耗尽后由 records.intro 合成的降纔回答（无豆瓣评分）；可单条「刷新」或「重排 intro 兜底」一键升级">
                 <Tag color="gold">降级</Tag>
               </Tooltip>
             }
@@ -72,6 +76,13 @@ function ProgressCard({
         <Button icon={<CloudDownloadOutlined />} loading={backfilling} onClick={onBackfill}>
           回填存量
         </Button>
+        {(counts?.intro_fallback ?? 0) > 0 && (
+          <Tooltip title="把全部 source=intro 兜底条目无条件强制重排（优先重抓 rexxar，不受 TTL 限制），成功后升级回权威数据">
+            <Button icon={<RedoOutlined />} loading={requeuingIntro} onClick={onRequeueIntro}>
+              重排 intro 兜底
+            </Button>
+          </Tooltip>
+        )}
       </Space>
     </Card>
   );
@@ -88,6 +99,7 @@ export default function Subjects() {
   const [error, setError] = useState<ApiError | null>(null);
   const [loading, setLoading] = useState(false);
   const [backfilling, setBackfilling] = useState(false);
+  const [requeuingIntro, setRequeuingIntro] = useState(false);
   const [refreshing, setRefreshing] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -124,6 +136,23 @@ export default function Subjects() {
     }
   };
 
+  const onRequeueIntro = async () => {
+    setRequeuingIntro(true);
+    try {
+      const r = await api.requeueSubjectJobs('intro');
+      if (r.queued > 0) {
+        message.success(`已重排 ${r.queued} 个 intro 兜底条目，worker 将优先重抓升级`);
+        load();
+      } else {
+        message.info('没有可重排的 intro 兜底条目（均已在队列中）');
+      }
+    } catch (e) {
+      message.error((e as ApiError).message);
+    } finally {
+      setRequeuingIntro(false);
+    }
+  };
+
   const onRefresh = async (s: Subject) => {
     setRefreshing(s.subject_id);
     try {
@@ -155,7 +184,13 @@ export default function Subjects() {
         />
       )}
 
-      <ProgressCard counts={data?.counts ?? null} onBackfill={onBackfill} backfilling={backfilling} />
+      <ProgressCard
+        counts={data?.counts ?? null}
+        onBackfill={onBackfill}
+        backfilling={backfilling}
+        onRequeueIntro={onRequeueIntro}
+        requeuingIntro={requeuingIntro}
+      />
 
       <Card size="small" style={{ marginBottom: 16 }}>
         <Space>
@@ -222,7 +257,7 @@ export default function Subjects() {
                   </a>{' '}
                   <Tag style={{ marginRight: 0 }}>{CATEGORY_OPTIONS.find((c) => c.value === s.category)?.label}</Tag>
                   {s.source === 'intro' && (
-                    <Tooltip title="rexxar 重试耗尽的 intro 兜底数据（无豆瓣评分）；行末「刷新」可强制重抓升级">
+                    <Tooltip title="rexxar 重试耗尽的 intro 兜底数据（无豆瓣评分）；行末「刷新」或上方「重排 intro 兜底」可强制重抓升级">
                       <Tag color="gold" style={{ marginRight: 0 }}>
                         intro 兜底
                       </Tag>
