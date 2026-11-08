@@ -18,14 +18,14 @@ import './welcome-page.css'
  *  同步，URL 带具体版本 tag（Gitee 无 GitHub 的 latest 别名），APP_VERSION
  *  仍是版本号唯一改点；资产名是 release.sh 统一的 ASCII 前缀（gh 上传
  *  会剥掉 CJK 文件名） */
-const APP_VERSION = '0.5.4'
+const APP_VERSION = '0.5.5'
 /** 上面的发布日期（页脚展示）：= GitHub Release v{APP_VERSION} 的发布日
  *  （当天本地日期，YYYY-MM-DD），随版本 bump 同步改——部署规范要求
  *  txy 网页端页脚与最新 App Release 的版本号+发布日期一致（见 ops/
  *  《txy部署手册.md》完整部署一节：一次完整部署 = 网页端上 txy + 发新版
  *  App，页脚是两端的对齐凭据）。计划日与实际发布日不符时以实际为准，
  *  改此处后重走 web 构建 */
-const APP_RELEASE_DATE = '2026-11-02'
+const APP_RELEASE_DATE = '2026-11-08'
 const APP_DMG_URL = `https://gitee.com/jiaowenjun/weimo-douban/releases/download/v${APP_VERSION}/weimo-douban_${APP_VERSION}_aarch64.dmg`
 const APP_EXE_URL = `https://gitee.com/jiaowenjun/weimo-douban/releases/download/v${APP_VERSION}/weimo-douban_${APP_VERSION}_x64-setup.exe`
 /** other 平台回落入口：Gitee 发行版列表页（同镜像域，大陆可达） */
